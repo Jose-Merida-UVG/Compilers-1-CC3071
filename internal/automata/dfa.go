@@ -1,5 +1,10 @@
 package automata
 
+import (
+	"fmt"
+	"sort"
+)
+
 // DFA defined by it's initial state, acceptance of each state is stored
 // within each state, as each state is unique to each DFA per its construction
 // we can define it there and simplify function calls in other files
@@ -68,5 +73,45 @@ func DFAAlphabetRecursive(state *DFAState, alphabet map[rune]bool, visited map[i
 			alphabet[symbol] = true
 		}
 		DFAAlphabetRecursive(nextState, alphabet, visited)
+	}
+}
+
+func (dfa *DFA) PrintTransitionTable() {
+	states := dfa.GetAllStates()
+
+	alphabet := dfa.Alphabet()
+
+	//ordenar símbolos
+	var symbols []rune
+	for s := range alphabet {
+		symbols = append(symbols, s)
+	}
+	sort.Slice(symbols, func(i, j int) bool {
+		return symbols[i] < symbols[j]
+	})
+
+	fmt.Println("\n--- Tabla de Transiciones DFA ---")
+
+	fmt.Printf("Estado\t")
+	for _, s := range symbols {
+		fmt.Printf("%c\t", s)
+	}
+	fmt.Println()
+
+	for _, state := range states {
+		marker := ""
+		if state.Accept {
+			marker = "*"
+		}
+		fmt.Printf("%d%s\t", state.ID, marker)
+
+		for _, s := range symbols {
+			if next, ok := state.Transitions[s]; ok {
+				fmt.Printf("%d\t", next.ID)
+			} else {
+				fmt.Printf("-\t")
+			}
+		}
+		fmt.Println()
 	}
 }

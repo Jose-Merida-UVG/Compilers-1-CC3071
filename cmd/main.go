@@ -30,8 +30,9 @@ func main() {
 	table := automata.BuildDirectTable(&astRoot)
 
 	dfa := table.ToDFA()
+	dfa.PrintTransitionTable()
 
-	fmt.Println("\n--- Simulación DFA Directo ---")
+	fmt.Println("\n--- Simulación DFA Directo, se genera un pdf ---")
 
 	graph.BuildDFA(dfa, "out/direct", "DirectDFA")
 

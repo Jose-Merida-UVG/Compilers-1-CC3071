@@ -1,0 +1,2 @@
+(a|b)*abb(a|b)*
+b+abc+

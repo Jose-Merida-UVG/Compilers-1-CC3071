@@ -2,9 +2,21 @@
 ## Autor: José Antonio Mérida Castejón
 ### Descripción
 Este proyecto consiste en la implementación de algoritmos básicos para la construcción de autómatas finitos a partir de expresiones regulares. Tiene como entrada expresiones regulares _r_ y cadenas _w_. A partir de cada expresión regular se transformá de su expresión infix a postfix, luego construyé un AFN utilizando construcción de Thompson. Este AFN se transforma a un AFD por construcción de subconjuntos, y por último se minimiza la cantidad de estados. Con cada uno de estos autómatas se determina si la cadena _w_ pertenece a _L(r)_
-### Ubicación de los archivos
-- **DATA**: El archivo .txt de expresiones regulares que funcionan como entrada
-- **OUT**: Folders conteniendo un PDF ilustrando NFA, DFA y DFA con estados minimizados para cada expresión regular dentro del archivo
+### Ubicación de los archivos y Arquitectura
+El objetivo más reciente del proyecto es la conversión directa de expresiones regulares a un Autómata Finito Determinista (AFD/DFA). A continuación, se detalla la estructura principal para revisión:
+
+**Archivos Principales (Conversión Directa a DFA)**
+- `internal/automata/direct.go`: Lógica principal para la construcción directa de un DFA.
+- `internal/automata/dfa.go`: Estructura y definición del Autómata Finito Determinista.
+- `internal/regex/syntaxtree.go`: Construcción del árbol sintáctico, esencial para el cálculo de funciones en el algoritmo de construcción directa.
+
+**Arquitectura Teórica: Método `toDFA`**
+En la conversión directa, el proceso se basa en calcular el `followpos` para los nodos del árbol sintáctico. Arquitectónicamente, uno puede imaginar que la tabla o estructura de datos que almacena estos cálculos posee un método `toDFA()`. Este método iniciaría con el estado correspondiente a `firstpos` de la raíz del árbol y, evaluando las transiciones según la tabla de `followpos`, construiría y retornaría un objeto DFA nuevo de manera directa (sin requerir la generación de un NFA intermedio).
+
+**Archivos Secundarios (Soporte)**
+- **DATA (`data/`)**: El archivo .txt de expresiones regulares de entrada.
+- **OUT (`out/`)**: Carpetas conteniendo PDFs ilustrando los autómatas (NFA, DFA, Minimizado).
+- El resto de paquetes (`internal/ds/`, `internal/graph/`, y otros archivos en `internal/automata/` y `internal/regex/`) proveen estructuras de datos, visualización y algoritmos de soporte secundario que no requieren revisión profunda para el objetivo de construcción directa.
 ### Dependencias
 Para correr este programa se debe de tener instalado [Graphviz](https://graphviz.org/) para el renderizado de los autómatas y [Golang](https://go.dev/doc/install).
 

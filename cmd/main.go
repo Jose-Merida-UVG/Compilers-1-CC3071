@@ -30,9 +30,6 @@ func main() {
 	table := automata.BuildDirectTable(&astRoot)
 
 	dfa := table.ToDFA()
-	dfa.PrintTransitionTable()
-
-	fmt.Println("\n--- Simulación DFA Directo, se genera un pdf ---")
 
 	graph.BuildDFA(dfa, "out/direct", "DirectDFA")
 
@@ -54,6 +51,9 @@ func main() {
 	}
 	fmt.Printf("\nStart State (FirstPos of root): %v\n", table.StartState)
 	fmt.Printf("Accept ID ('#'): %d\n", table.AcceptID)
+
+	dfa.PrintTransitionTable()
+	fmt.Println("\n--- Simulación DFA Directo, se genera un pdf ---")
 }
 
 func printTree(node *ds.Node[regex.ASTNodeData], prefix string, isTail bool) {

@@ -1,78 +1,39 @@
-# Proyecto 1: Expresiones Regulares y Autómatas
-## Autor: José Antonio Mérida Castejón
-### Descripción
-Este proyecto consiste en la implementación de algoritmos básicos para la construcción de autómatas finitos a partir de expresiones regulares. Tiene como entrada expresiones regulares _r_ y cadenas _w_. A partir de cada expresión regular se transformá de su expresión infix a postfix, luego construyé un AFN utilizando construcción de Thompson. Este AFN se transforma a un AFD por construcción de subconjuntos, y por último se minimiza la cantidad de estados. Con cada uno de estos autómatas se determina si la cadena _w_ pertenece a _L(r)_
-### Ubicación de los archivos y Arquitectura
-El objetivo más reciente del proyecto es la conversión directa de expresiones regulares a un Autómata Finito Determinista (AFD/DFA). A continuación, se detalla la estructura principal para revisión:
+# Compiler Design Project: Direct Regex to DFA
 
-**Archivos Principales (Conversión Directa a DFA)**
-- `internal/automata/direct.go`: Lógica principal para la construcción directa de un DFA.
-- `internal/automata/dfa.go`: Estructura y definición del Autómata Finito Determinista.
-- `internal/regex/syntaxtree.go`: Construcción del árbol sintáctico, esencial para el cálculo de funciones en el algoritmo de construcción directa.
+Hey everyone! Welcome to the repository. 
 
-**Arquitectura Teórica: Método `toDFA`**
-En la conversión directa, el proceso se basa en calcular el `followpos` para los nodos del árbol sintáctico. Arquitectónicamente, uno puede imaginar que la tabla o estructura de datos que almacena estos cálculos posee un método `toDFA()`. Este método iniciaría con el estado correspondiente a `firstpos` de la raíz del árbol y, evaluando las transiciones según la tabla de `followpos`, construiría y retornaría un objeto DFA nuevo de manera directa (sin requerir la generación de un NFA intermedio).
+We are currently shifting our focus to the newest objective for this project: **Direct Conversion of Regular Expressions to Deterministic Finite Automata (DFA)**. 
 
-**Archivos Secundarios (Soporte)**
-- **DATA (`data/`)**: El archivo .txt de expresiones regulares de entrada.
-- **OUT (`out/`)**: Carpetas conteniendo PDFs ilustrando los autómatas (NFA, DFA, Minimizado).
-- El resto de paquetes (`internal/ds/`, `internal/graph/`, y otros archivos en `internal/automata/` y `internal/regex/`) proveen estructuras de datos, visualización y algoritmos de soporte secundario que no requieren revisión profunda para el objetivo de construcción directa.
-### Dependencias
-Para correr este programa se debe de tener instalado [Graphviz](https://graphviz.org/) para el renderizado de los autómatas y [Golang](https://go.dev/doc/install).
+This README serves as a quick guide to help you navigate the codebase and understand where to focus your efforts for this new implementation.
 
-### Demostración
-Archivo de entrada regex.txt
-```
-(a|b)*abb(a|b)*
-b+abc+
-```
+## 🎯 Current Objective: Direct DFA Construction
 
-Salida en Consola / Conversion a Postfix
+Instead of the traditional route (Regex -> NFA via Thompson -> DFA via Subset Construction), we are now building the DFA directly from the regex's syntax tree using `firstpos`, `lastpos`, `nullable`, and `followpos` functions.
 
-![image](https://github.com/user-attachments/assets/3d39a40f-b454-411e-bc2b-1a72b5a27134)
+### 🏗️ Architecture & How It Works
 
-DFA Minimizado (a|b)\*abb(a|b)\*
+The core idea is to compute a `followpos` table from the augmented syntax tree (appending `#` to the regex). 
 
-![image](https://github.com/user-attachments/assets/5812c2ac-e668-42e8-a301-2dbe1f6a54d4)
+Conceptually, you can imagine this table (or the state tracking structure) having a `toDFA()` method. 
+- This method would start by taking the `firstpos` of the root node of our syntax tree as the initial state of the new DFA.
+- It would then iterate through the active positions, looking up transitions in the `followpos` table for each input symbol.
+- For every new set of positions encountered, it creates a new DFA state.
+- Ultimately, `toDFA()` returns a fully constructed, direct DFA object without ever building an intermediate NFA!
 
-DFA Minimizado b+abc+
+## 📂 Where to Look (Important Files)
 
-![image](https://github.com/user-attachments/assets/270f2319-2b48-4b0d-8992-c184a935236b)
+If you're jumping in to help with the direct conversion, these are the files you need to care about:
 
+- **`internal/automata/direct.go`**: This is where the magic should happen. The main logic for the direct construction algorithm lives here.
+- **`internal/automata/dfa.go`**: Contains the struct definitions and methods for our DFA object.
+- **`internal/regex/syntaxtree.go`**: Crucial for the first step. This parses the regex into a syntax tree and is where the calculations for `nullable`, `firstpos`, `lastpos`, and `followpos` need to be handled.
 
-### Corrida / Compilacion
-```
-go run cmd/main.go
-```
+## 🗃️ Everything Else (The Useless/Extra Stuff for Now)
 
-```
-go build -o bin/main.exe cmd/main.go
-```
+Don't worry too much about the rest of the repository for this specific task. The following are just supporting structures or old implementations:
+- `internal/automata/thompson.go` & `internal/automata/subsetconversion.go`: The old NFA/DFA conversion pipeline.
+- `internal/ds/`: Basic data structures (Stacks, Trees) used across the project.
+- `internal/graph/`: Code for rendering the graph visuals (Graphviz stuff).
+- `data/` & `out/`: Just input strings and output PDFs.
 
-```
-./bin/main
-```
-
-### Ejemplificación de Manejo de Errores / Validación de Regex (Obligado por Bidkar :sob:)
-Balanceo de Expresion
-```
-)aa(b)
-```
-![image](https://github.com/user-attachments/assets/b236a419-d948-47d7-bfb1-5804f9d296ac)
-
-Balanceo de Expresion con Caracteres Escapados
-```
-\)aa(b)
-\(F)
-```
-![image](https://github.com/user-attachments/assets/162a8947-4ab4-4869-ae37-43d28038c996)
-
-Expresiones Regulares No Validas (Error en Construcción con Thompson)
-```
-(a|)
-```
-![image](https://github.com/user-attachments/assets/322ecd9f-b506-4160-bdd8-b29007acf725)
-```
-***
-```
-![image](https://github.com/user-attachments/assets/b0e28d1b-d075-4c9e-9d3a-8097b7168145)
+Let's get this direct conversion working!

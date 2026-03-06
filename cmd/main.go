@@ -54,6 +54,17 @@ func main() {
 
 	dfa.PrintTransitionTable()
 	fmt.Println("\n--- Simulación DFA Directo, se genera un pdf ---")
+
+	//obtener un string de consola
+	var input string
+	fmt.Print("\nIngrese una cadena: ")
+	fmt.Scanln(&input)
+
+	if dfa.Sim(input) {
+		fmt.Println("La cadena PERTENECE al lenguaje.")
+	} else {
+		fmt.Println("La cadena NO pertenece al lenguaje.")
+	}
 }
 
 func printTree(node *ds.Node[regex.ASTNodeData], prefix string, isTail bool) {

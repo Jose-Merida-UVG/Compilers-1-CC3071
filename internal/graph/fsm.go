@@ -12,6 +12,7 @@ func BuildGraph(fsm *automata.NFA, dir string, filename string) {
 	visited := make(map[int]bool)
 	content = AddState(fsm.StartState, visited, content)
 	WriteFile(content, dir, filename)
+	cmd := exec.Command("dot", "-Tpdf", dotFilePath, "-o", pdfFilePath)
 }
 
 // Recursive function that draws state and it's transitions

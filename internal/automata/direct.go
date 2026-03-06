@@ -3,6 +3,8 @@ package automata
 import (
 	"github.com/TonitoMC/TDLCGo/internal/ds"
 	"github.com/TonitoMC/TDLCGo/internal/regex"
+	"fmt"
+	"sort"
 )
 
 // This file implements the 'meat & potatoes' of the direct method
@@ -164,4 +166,95 @@ func copySlice(a []int) []int {
 	res := make([]int, len(a))
 	copy(res, a)
 	return res
+}
+
+func (table *DirectTable) ToDFA() *DFA {
+
+	// mapa: clave string del conjunto → estado DFA
+	stateMap := make(map[string]*DFAState)
+
+	setKey := func(set []int) string {
+		cpy := make([]int, len(set))
+		copy(cpy, set)
+		sort.Ints(cpy)
+		key := ""
+		for _, v := range cpy {
+			key += fmt.Sprintf("%d,", v)
+		}
+		return key
+	}
+
+	contains := func(slice []int, value int) bool {
+		for _, v := range slice {
+			if v == value {
+				return true
+			}
+		}
+		return false
+	}
+
+	queue := [][]int{}
+
+	startSet := table.StartState
+	startKey := setKey(startSet)
+
+	startState := NewDFAState()
+	if contains(startSet, table.AcceptID) {
+		startState.SetAccepting()
+	}
+
+	stateMap[startKey] = startState
+	queue = append(queue, startSet)
+
+	for len(queue) > 0 {
+		currentSet := queue[0]
+		queue = queue[1:]
+
+		currentKey := setKey(currentSet)
+		currentDFAState := stateMap[currentKey]
+
+		alphabet := make(map[rune]bool)
+		for _, char := range table.PosToChar {
+			if char != '#' {
+				alphabet[char] = true
+			}
+		}
+
+		for symbol := range alphabet {
+
+			newSetMap := make(map[int]bool)
+
+			for _, pos := range currentSet {
+				if table.PosToChar[pos] == symbol {
+					for next := range table.NextPos[pos] {
+						newSetMap[next] = true
+					}
+				}
+			}
+
+			if len(newSetMap) == 0 {
+				continue
+			}
+
+			var newSet []int
+			for id := range newSetMap {
+				newSet = append(newSet, id)
+			}
+
+			newKey := setKey(newSet)
+
+			if _, exists := stateMap[newKey]; !exists {
+				newState := NewDFAState()
+				if contains(newSet, table.AcceptID) {
+					newState.SetAccepting()
+				}
+				stateMap[newKey] = newState
+				queue = append(queue, newSet)
+			}
+
+			currentDFAState.AddTransition(stateMap[newKey], symbol)
+		}
+	}
+
+	return NewDFA(startState)
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/TonitoMC/TDLCGo/internal/automata"
 	"github.com/TonitoMC/TDLCGo/internal/ds"
 	"github.com/TonitoMC/TDLCGo/internal/regex"
+	"github.com/TonitoMC/TDLCGo/internal/graph"
 )
 
 func main() {
@@ -27,6 +28,12 @@ func main() {
 
 	// Compute attributes and build the DirectTable context
 	table := automata.BuildDirectTable(&astRoot)
+
+	dfa := table.ToDFA()
+
+	fmt.Println("\n--- Simulación DFA Directo ---")
+
+	graph.BuildDFA(dfa, "out/direct", "DirectDFA")
 
 	// Print Tree
 	fmt.Println("\n--- AST Attributes (Post-Order) ---")

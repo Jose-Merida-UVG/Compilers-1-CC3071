@@ -60,28 +60,14 @@ func main() {
 		graph.BuildASTGraph(&astRoot, outputDir, outputFile)
 		fmt.Printf("Annotated AST written to %s/%s.pdf\n", outputDir, outputFile)
 
-		// Print Tree
-		fmt.Println("\n--- AST Attributes (Post-Order) ---")
-		printTree(&astRoot, "", true)
-
-		// Print NextPos Table
-		fmt.Println("\n--- NextPos Table ---")
-		for id, nextSet := range table.NextPos {
-			var nextList []int
-			for nextID := range nextSet {
-				nextList = append(nextList, nextID)
-			}
-			// Sort for consistent output, useful for debugging
-			// slices.Sort(nextList) // Only if Go 1.21+ and slices package is imported
-			char := table.PosToChar[id]
-			fmt.Printf("ID %d ('%c'): %v\n", id, char, nextList)
-		}
-		fmt.Printf("\nStart State (FirstPos of root): %v\n", table.StartState)
-		fmt.Printf("Accept ID ('#'): %d\n", table.AcceptID)
+		// Render DFA graph to out/DFA_regex<N>.pdf
+		dfaOutputFile := fmt.Sprintf("DFA_regex%d", regexNum)
+		graph.BuildDFA(dfa, outputDir, dfaOutputFile)
+		fmt.Printf("DFA graph written to %s/%s.pdf\n", outputDir, dfaOutputFile)
 
 		// Print transition table
+		fmt.Println("\n--- DFA Transition Table ---")
 		dfa.PrintTransitionTable()
-		fmt.Println("\n--- Simulación DFA Directo, se genera un pdf ---")
 
 		regexNum++
 	}

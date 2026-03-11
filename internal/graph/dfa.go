@@ -6,39 +6,7 @@ import (
 	"github.com/TonitoMC/TDLCGo/internal/automata"
 )
 
-// Builds a .DOT file that represents a FSM
-func BuildGraph(fsm *automata.NFA, dir string, filename string) {
-	content := CreateHeader()
-	visited := make(map[int]bool)
-	content = AddState(fsm.StartState, visited, content)
-	WriteFile(content, dir, filename)
-}
-
-// Recursive function that draws state and it's transitions
-func AddState(state *automata.State, visited map[int]bool, content string) string {
-	if visited[state.ID] {
-		return content
-	}
-	stateLabel := fmt.Sprintf("%d", len(visited))
-	stateID := fmt.Sprintf("%d", state.ID)
-	visited[state.ID] = true
-	content = AddNode(content, stateID, stateLabel)
-
-	for char, nextState := range state.Transitions {
-		nextStateID := fmt.Sprintf("%d", nextState.ID)
-		content = AddState(nextState, visited, content)
-		transitionLabel := fmt.Sprintf("%c", char)
-		content = AddEdge(content, stateID, nextStateID, transitionLabel)
-	}
-	for _, nextState := range state.EpsilonTransitions {
-		nextStateID := fmt.Sprintf("%d", nextState.ID)
-		content = AddState(nextState, visited, content)
-		content = AddEdge(content, stateID, nextStateID, "ε")
-	}
-	return content
-}
-
-// Builds a .DOT file that represents a FSM
+// Builds a .DOT file that represents a DFA
 func BuildDFA(dfa *automata.DFA, dir string, filename string) {
 	content := CreateHeader()
 	visited := make(map[int]bool)

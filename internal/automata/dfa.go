@@ -81,7 +81,7 @@ func (dfa *DFA) PrintTransitionTable() {
 
 	alphabet := dfa.Alphabet()
 
-	//ordenar símbolos
+	// ordenar símbolos
 	var symbols []rune
 	for s := range alphabet {
 		symbols = append(symbols, s)

@@ -1,10 +1,11 @@
 package automata
 
 import (
-	"github.com/TonitoMC/TDLCGo/internal/ds"
-	"github.com/TonitoMC/TDLCGo/internal/regex"
 	"fmt"
 	"sort"
+
+	"github.com/TonitoMC/TDLCGo/internal/ds"
+	"github.com/TonitoMC/TDLCGo/internal/regex"
 )
 
 // This file implements the 'meat & potatoes' of the direct method
@@ -133,7 +134,7 @@ func computeAttributes(node *ds.Node[regex.ASTNodeData], table *DirectTable) {
 		node.Value.LastPos = copySlice(node.Left.Value.LastPos)
 
 		// Update NextPos for Kleene Star
-		// For every position in LastPos(Left child), every position in FirstPos(Left child) is a nextpos.
+		// For every position in LastPos(Left child), every position in FirstPos(Right child) is a nextpos.
 		for _, posInLastLeft := range node.Left.Value.LastPos {
 			if _, exists := table.NextPos[posInLastLeft]; !exists {
 				table.NextPos[posInLastLeft] = make(map[int]bool)
@@ -169,7 +170,6 @@ func copySlice(a []int) []int {
 }
 
 func (table *DirectTable) ToDFA() *DFA {
-
 	// mapa: clave string del conjunto → estado DFA
 	stateMap := make(map[string]*DFAState)
 

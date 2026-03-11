@@ -105,7 +105,7 @@ func computeAttributes(node *ds.Node[regex.ASTNodeData], table *DirectTable) {
 
 		// Lastpos, depends on nullability
 		if node.Right.Value.Nullable {
-			// LastPos = U(L.firstPos, R.firstPos)
+			// LastPos = U(L.lastPos, R.lastPos)
 			node.Value.LastPos = union(node.Left.Value.LastPos, node.Right.Value.LastPos)
 		} else {
 			node.Value.LastPos = copySlice(node.Right.Value.LastPos)

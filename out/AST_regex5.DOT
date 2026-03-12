@@ -1,21 +1,17 @@
 digraph "ast" {
 	rankdir=TB
 	node [shape=plaintext fontname="Courier"]
-	n0 [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3"><TR><TD ALIGN="CENTER"><FONT COLOR="navy">{1,2}</FONT></TD><TD ALIGN="CENTER"><FONT COLOR="darkgreen">{5}</FONT></TD></TR><TR><TD COLSPAN="2" ALIGN="CENTER"><B>·</B> &nbsp; <I>F</I></TD></TR></TABLE>>]
-	n1 [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3"><TR><TD ALIGN="CENTER"><FONT COLOR="navy">{1,2}</FONT></TD><TD ALIGN="CENTER"><FONT COLOR="darkgreen">{3,4}</FONT></TD></TR><TR><TD COLSPAN="2" ALIGN="CENTER"><B>·</B> &nbsp; <I>F</I></TD></TR></TABLE>>]
-	n2 [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3"><TR><TD ALIGN="CENTER"><FONT COLOR="navy">{1,2}</FONT></TD><TD ALIGN="CENTER"><FONT COLOR="darkgreen">{1,2}</FONT></TD></TR><TR><TD COLSPAN="2" ALIGN="CENTER"><B>|</B> &nbsp; <I>F</I></TD></TR></TABLE>>]
-	n3 [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3"><TR><TD ALIGN="CENTER"><FONT COLOR="navy">{1}</FONT></TD><TD ALIGN="CENTER"><FONT COLOR="darkgreen">{1}</FONT></TD></TR><TR><TD COLSPAN="2" ALIGN="CENTER"><B>a</B> &nbsp; <I>F</I></TD></TR></TABLE>>]
+	n0 [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3"><TR><TD ALIGN="CENTER"><FONT COLOR="navy">{1,2,3}</FONT></TD><TD ALIGN="CENTER"><FONT COLOR="darkgreen">{3}</FONT></TD></TR><TR><TD COLSPAN="2" ALIGN="CENTER"><B>·</B> &nbsp; <I>F</I></TD></TR></TABLE>>]
+	n1 [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3"><TR><TD ALIGN="CENTER"><FONT COLOR="navy">{1,2}</FONT></TD><TD ALIGN="CENTER"><FONT COLOR="darkgreen">{1,2}</FONT></TD></TR><TR><TD COLSPAN="2" ALIGN="CENTER"><B>*</B> &nbsp; <I>T</I></TD></TR></TABLE>>]
+	n2 [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3"><TR><TD ALIGN="CENTER"><FONT COLOR="navy">{1,2}</FONT></TD><TD ALIGN="CENTER"><FONT COLOR="darkgreen">{1,2}</FONT></TD></TR><TR><TD COLSPAN="2" ALIGN="CENTER"><B>*</B> &nbsp; <I>T</I></TD></TR></TABLE>>]
+	n3 [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3"><TR><TD ALIGN="CENTER"><FONT COLOR="navy">{1,2}</FONT></TD><TD ALIGN="CENTER"><FONT COLOR="darkgreen">{1,2}</FONT></TD></TR><TR><TD COLSPAN="2" ALIGN="CENTER"><B>|</B> &nbsp; <I>F</I></TD></TR></TABLE>>]
+	n4 [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3"><TR><TD ALIGN="CENTER"><FONT COLOR="navy">{1}</FONT></TD><TD ALIGN="CENTER"><FONT COLOR="darkgreen">{1}</FONT></TD></TR><TR><TD COLSPAN="2" ALIGN="CENTER"><B>a</B> &nbsp; <I>F</I></TD></TR></TABLE>>]
+	n3 -> n4
+	n5 [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3"><TR><TD ALIGN="CENTER"><FONT COLOR="navy">{2}</FONT></TD><TD ALIGN="CENTER"><FONT COLOR="darkgreen">{2}</FONT></TD></TR><TR><TD COLSPAN="2" ALIGN="CENTER"><B>b</B> &nbsp; <I>F</I></TD></TR></TABLE>>]
+	n3 -> n5
 	n2 -> n3
-	n4 [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3"><TR><TD ALIGN="CENTER"><FONT COLOR="navy">{2}</FONT></TD><TD ALIGN="CENTER"><FONT COLOR="darkgreen">{2}</FONT></TD></TR><TR><TD COLSPAN="2" ALIGN="CENTER"><B>b</B> &nbsp; <I>F</I></TD></TR></TABLE>>]
-	n2 -> n4
 	n1 -> n2
-	n5 [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3"><TR><TD ALIGN="CENTER"><FONT COLOR="navy">{3,4}</FONT></TD><TD ALIGN="CENTER"><FONT COLOR="darkgreen">{3,4}</FONT></TD></TR><TR><TD COLSPAN="2" ALIGN="CENTER"><B>|</B> &nbsp; <I>F</I></TD></TR></TABLE>>]
-	n6 [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3"><TR><TD ALIGN="CENTER"><FONT COLOR="navy">{3}</FONT></TD><TD ALIGN="CENTER"><FONT COLOR="darkgreen">{3}</FONT></TD></TR><TR><TD COLSPAN="2" ALIGN="CENTER"><B>a</B> &nbsp; <I>F</I></TD></TR></TABLE>>]
-	n5 -> n6
-	n7 [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3"><TR><TD ALIGN="CENTER"><FONT COLOR="navy">{4}</FONT></TD><TD ALIGN="CENTER"><FONT COLOR="darkgreen">{4}</FONT></TD></TR><TR><TD COLSPAN="2" ALIGN="CENTER"><B>b</B> &nbsp; <I>F</I></TD></TR></TABLE>>]
-	n5 -> n7
-	n1 -> n5
 	n0 -> n1
-	n8 [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3"><TR><TD ALIGN="CENTER"><FONT COLOR="navy">{5}</FONT></TD><TD ALIGN="CENTER"><FONT COLOR="darkgreen">{5}</FONT></TD></TR><TR><TD COLSPAN="2" ALIGN="CENTER"><B>#</B> &nbsp; <I>F</I></TD></TR></TABLE>>]
-	n0 -> n8
+	n6 [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3"><TR><TD ALIGN="CENTER"><FONT COLOR="navy">{3}</FONT></TD><TD ALIGN="CENTER"><FONT COLOR="darkgreen">{3}</FONT></TD></TR><TR><TD COLSPAN="2" ALIGN="CENTER"><B>#</B> &nbsp; <I>F</I></TD></TR></TABLE>>]
+	n0 -> n6
 }

@@ -1,3 +1,5 @@
 a+b|c*
 (a|b)*cd?
 a?(b|c)*d*e
+(a|b)*a(a|b)*a(a|b)*
+((a|b)*)*

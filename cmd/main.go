@@ -129,6 +129,23 @@ func main() {
 				}
 				fmt.Printf("  %-16s → accepted=%-5t (expected %-5t) %s\n", display, result, tc.expected, status)
 			}
+
+			fmt.Println("\n--- Simulación con DFA Minimizado ---")
+			for _, tc := range cases {
+				display := tc.input
+				if display == "" {
+					display = "ε"
+				}
+
+				result := minDFA.Sim(tc.input)
+				status := "✓"
+				if result != tc.expected {
+					status = "✗ MISMATCH"
+				}
+
+				fmt.Printf("  %-16s → accepted=%-5t (expected %-5t) %s\n",
+					display, result, tc.expected, status)
+			}
 		}
 
 		regexNum++

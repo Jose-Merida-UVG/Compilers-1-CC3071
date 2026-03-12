@@ -76,6 +76,7 @@ func main() {
 		astRoot := regex.BuildDirectAST(rs)
 		table := automata.BuildDirectTable(&astRoot)
 		dfa := table.ToDFA()
+		minDFA := dfa.Minimize() //minimización
 
 		// Render AST and DFA graphs
 		outputDir := "out"
@@ -101,6 +102,10 @@ func main() {
 		// Print transition table
 		fmt.Println("\n--- DFA Transition Table ---")
 		dfa.PrintTransitionTable()
+
+		//Print tabla minimizada
+		fmt.Println("\n--- DFA Minimizado Transition Table ---")
+		minDFA.PrintTransitionTable()
 
 		// Simulate test strings
 		if cases, ok := testCases[regexNum]; ok {

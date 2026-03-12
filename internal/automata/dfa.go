@@ -115,3 +115,12 @@ func (dfa *DFA) PrintTransitionTable() {
 		fmt.Println()
 	}
 }
+
+func (dfa *DFA) CountTransitions() int { //función para contar estados y transiciones
+	states := dfa.GetAllStates()
+	count := 0
+	for _, state := range states {
+		count += len(state.Transitions)
+	}
+	return count
+}

@@ -107,6 +107,13 @@ func main() {
 		fmt.Println("\n--- DFA Minimizado Transition Table ---")
 		minDFA.PrintTransitionTable()
 
+		fmt.Println("\n--- Comparación ---")
+		fmt.Printf("DFA directo:     %d estados, %d transiciones\n",
+			len(dfa.GetAllStates()), dfa.CountTransitions())
+
+		fmt.Printf("DFA minimizado:  %d estados, %d transiciones\n",
+			len(minDFA.GetAllStates()), minDFA.CountTransitions())
+
 		// Simulate test strings
 		if cases, ok := testCases[regexNum]; ok {
 			fmt.Println("\n--- String Simulation ---")

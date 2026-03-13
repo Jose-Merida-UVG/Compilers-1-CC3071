@@ -21,6 +21,11 @@ type testCase struct {
 // Regex 1: a+b|c*    — accepts (a+b) or (c*)
 // Regex 2: (a|b)*cd? — accepts zero or more a/b, then c, then optional d
 // Regex 3: a?(b|c)*d*e — accepts optional a, zero or more b/c, zero or more d, then e
+// Regex 4: (a|b)*a(a|b)*a(a|b)* — needs at least two a's
+// Regex 5: ((a|b)*)* — nested Kleene star
+// Regex 6: (ab|ac)b — shared prefix
+// Regex 7: (a*b*)*c — nested loops
+// Regex 8: (a|b)*a(a|b)*b — needs at least one a and one b with a before b
 var testCases = map[int][]testCase{
 	1: {
 		{"aaaab", true},  // long a+ chain followed by b
@@ -39,6 +44,50 @@ var testCases = map[int][]testCase{
 		{"bcce", true},      // no a, mixed b/c repetition, straight to e
 		{"abcbcd", false},   // everything present except the required final e
 		{"aabce", false},    // two a's — a? only allows one
+	},
+	4: {
+		{"aa", true}, // minimal: two a's
+		{"a", false}, // only one a
+	},
+	5: {
+		{"abab", true}, // nested star accepts
+		{"", true},     // empty string accepted
+	},
+	6: {
+		{"abb", true}, // ab then b
+		{"acb", true}, // ac then b
+	},
+	7: {
+		{"aabbbc", true}, // loops then c
+		{"c", true},      // just c
+	},
+	8: {
+		{"aab", true}, // a before b
+		{"ab", true},  // minimal
+	},
+	9: {
+		{"aaa", true}, // three a's
+		{"bbb", true}, // three b's
+	},
+	10: {
+		{"aaac", true}, // a* then c
+		{"bbbc", true}, // b* then c
+	},
+	11: {
+		{"aaa", true}, // a*a
+		{"bb", true},  // b*b
+	},
+	12: {
+		{"a", true},   // single a
+		{"aaa", true}, // multiple a's
+	},
+	13: {
+		{"ab", true},   // a then b
+		{"aabb", true}, // aa then bb
+	},
+	14: {
+		{"abb", true},    // contains abb
+		{"aabbaa", true}, // contains abb in middle
 	},
 }
 
@@ -78,34 +127,14 @@ func main() {
 		dfa := table.ToDFA()
 		minDFA := dfa.Minimize() //minimización
 
-		// Render AST and DFA graphs
+		// Render DFA graphs
 		outputDir := "out"
-		astFile := fmt.Sprintf("AST_regex%d", regexNum)
 		dfaFile := fmt.Sprintf("DFA_regex%d", regexNum)
-		graph.BuildASTGraph(&astRoot, outputDir, astFile)
+		minDfaFile := fmt.Sprintf("MinDFA_regex%d", regexNum)
 		graph.BuildDFA(dfa, outputDir, dfaFile)
-		fmt.Printf("AST  → %s/%s.pdf\n", outputDir, astFile)
-		fmt.Printf("DFA  → %s/%s.pdf\n", outputDir, dfaFile)
-
-		// Print NextPos table
-		fmt.Println("\n--- NextPos Table ---")
-		for id, nextSet := range table.NextPos {
-			var nextList []int
-			for nextID := range nextSet {
-				nextList = append(nextList, nextID)
-			}
-			fmt.Printf("  ID %d ('%c'): %v\n", id, table.PosToChar[id], nextList)
-		}
-		fmt.Printf("\nStart State: %v\n", table.StartState)
-		fmt.Printf("Accept ID:   %d\n", table.AcceptID)
-
-		// Print transition table
-		fmt.Println("\n--- DFA Transition Table ---")
-		dfa.PrintTransitionTable()
-
-		//Print tabla minimizada
-		fmt.Println("\n--- DFA Minimizado Transition Table ---")
-		minDFA.PrintTransitionTable()
+		graph.BuildDFA(minDFA, outputDir, minDfaFile)
+		fmt.Printf("DFA     → %s/%s.pdf\n", outputDir, dfaFile)
+		fmt.Printf("MinDFA  → %s/%s.pdf\n", outputDir, minDfaFile)
 
 		fmt.Println("\n--- Comparación ---")
 		fmt.Printf("DFA directo:     %d estados, %d transiciones\n",

@@ -1,0 +1,9 @@
+digraph "graph" {
+	rankdir=LR size = "8,5"
+	node[shape=circle]
+	41 [label=0]
+	41 -> 41 [label="b"]
+	42 [label=1][shape=doublecircle]
+	41 -> 42 [label="c"]
+	41 -> 41 [label="a"]
+}

@@ -3,3 +3,12 @@ a+b|c*
 a?(b|c)*d*e
 (a|b)*a(a|b)*a(a|b)*
 ((a|b)*)*
+(ab|ac)b
+(a*b*)*c
+(a|b)*a(a|b)*b
+(a|b)(a|b)(a|b)
+(a*|b*)c
+a*a|b*b
+(aa*|a)
+(a|aa)(b|bb)
+(a|b)*abb(a|b)*

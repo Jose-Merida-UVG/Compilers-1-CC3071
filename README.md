@@ -5,10 +5,10 @@ A Go implementation that converts regular expressions directly to Deterministic 
 ## Video Demos
 
 **Direct Method (DFA Construction)**
-> [Add video link here]
+> [Video / Presentation](https://www.canva.com/design/DAHDxF77dy0/gChJPkQQRjP2reRrq6SVfQ/view?utm_content=DAHDxF77dy0&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=h6f8a2dfbd7)
 
 **State Minimization**
-> [Add video link here]
+> [Video](https://youtu.be/zhQj7pnqu0c)
 
 ## What It Does
 

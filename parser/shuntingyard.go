@@ -1,9 +1,9 @@
-package regex
+package parser
 
 import (
 	"slices"
 
-	"github.com/TonitoMC/TDLCGo/internal/ds"
+	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/ds"
 )
 
 // Shunting Yard algorithm is used to turn expressions

@@ -1,0 +1,4 @@
+(* Test: single backslash at end of line - INVALID but how do we handle? *)
+let a = '\'
+rule test =
+  'a' { return A }

@@ -3,7 +3,7 @@ package graph
 import (
 	"fmt"
 
-	"github.com/TonitoMC/TDLCGo/internal/automata"
+	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/automata"
 )
 
 // Builds a .DOT file that represents a DFA

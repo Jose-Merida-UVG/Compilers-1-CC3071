@@ -1,7 +1,7 @@
-package regex
+package parser
 
 import (
-	"github.com/TonitoMC/TDLCGo/internal/ds"
+	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/ds"
 )
 
 // ASTNodeData holds the data needed for direct DFA conversion algorithms.

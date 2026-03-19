@@ -1,4 +1,4 @@
-package regex
+package parser
 
 import (
 	"strings"
@@ -68,4 +68,3 @@ func (rs *RegexString) AppendEndMarker() {
 	// Append concatenation operator to join the previous expression with '#'
 	rs.Chars = append(rs.Chars, Token{Value: '~', escaped: false})
 }
-

@@ -1,0 +1,37 @@
+(* Ultimate escape sequence test *)
+{
+import "testing"
+}
+
+(* Test各种 escape sequences in different contexts *)
+let single_backslash = '\'
+let double_backslash = '\\'
+let escaped_single = '\''
+let escaped_double = "\""
+let escaped_bracket = '\{'
+let escaped_pipe = '\|'
+let nested_quote = '"'
+let backslash_n = '\n'
+let backslash_t = '\t'
+
+rule test_escapes =
+  '\' { return ONE_BACKSLASH }
+| '\\' { return TWO_BACKSLASH }
+| '\'' { return ESCAPED_SINGLE_QUOTE }
+| "\"" { return ESCAPED_DOUBLE_QUOTE }
+| '\{' { return ESCAPED_BRACE }
+| '\|' { return ESCAPED_PIPE }
+| '\n' { return NEWLINE }
+| '\t' { return TAB }
+| "'" { return SINGLE_QUOTE }
+| '"' { return DOUBLE_QUOTE }
+| "test\\path" { return BACKSLASH_IN_DOUBLE }
+| 'test\'path' { return BACKSLASH_IN_SINGLE }
+| eof { return EOF }
+
+{
+func test() {
+    fmt.Println("test\\ntest")
+    fmt.Println('test\'test')
+}
+}

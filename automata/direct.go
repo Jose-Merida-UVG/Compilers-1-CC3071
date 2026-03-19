@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/TonitoMC/TDLCGo/internal/ds"
-	"github.com/TonitoMC/TDLCGo/internal/regex"
+	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/ds"
+	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/parser"
 )
 
 // This file implements the 'meat & potatoes' of the direct method
 // for convering a regular expression into a DFA. It takes a tree
-// made in regex/syntaxtree.go (would've been nice to have it here
+// made in parser/syntaxtree.go (would've been nice to have it here
 // in hindsight) and gives us a table with information we need
 // to construct the DFA
 
@@ -35,7 +35,7 @@ type DirectTable struct {
 
 // This function also populates the DirectTable with NextPos and PosToChar mappings,
 // and sets the initial StartState and AcceptID.
-func BuildDirectTable(root *ds.Node[regex.ASTNodeData]) *DirectTable {
+func BuildDirectTable(root *ds.Node[parser.ASTNodeData]) *DirectTable {
 	if root == nil {
 		return nil
 	}
@@ -57,7 +57,7 @@ func BuildDirectTable(root *ds.Node[regex.ASTNodeData]) *DirectTable {
 // in the AST built for direct DFA conversion using a recursive approach for
 // post-order trasversal. It also populates the DirectTable with NextPos and
 // PosToChar mappings.
-func computeAttributes(node *ds.Node[regex.ASTNodeData], table *DirectTable) {
+func computeAttributes(node *ds.Node[parser.ASTNodeData], table *DirectTable) {
 	if node == nil {
 		return
 	}

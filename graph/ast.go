@@ -8,14 +8,14 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/TonitoMC/TDLCGo/internal/ds"
-	"github.com/TonitoMC/TDLCGo/internal/regex"
+	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/ds"
+	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/parser"
 )
 
 // BuildASTGraph produces a top-down annotated tree diagram and writes it to
 // <dir>/<filename>.pdf via Graphviz.  Errors from the DOT pipeline are printed
 // to stdout (matching the behaviour of BuildGraph / BuildDFA).
-func BuildASTGraph(root *ds.Node[regex.ASTNodeData], dir string, filename string) {
+func BuildASTGraph(root *ds.Node[parser.ASTNodeData], dir string, filename string) {
 	if root == nil {
 		return
 	}
@@ -34,7 +34,7 @@ func astHeader() string {
 // node, then for its children.  It returns the updated DOT content and the
 // integer ID that was assigned to this node so the caller can draw an edge.
 // Node IDs are assigned in pre-order via the shared counter.
-func addASTNode(node *ds.Node[regex.ASTNodeData], counter *int, content string) (string, int) {
+func addASTNode(node *ds.Node[parser.ASTNodeData], counter *int, content string) (string, int) {
 	myID := *counter
 	*counter++
 
@@ -64,7 +64,7 @@ func addASTNode(node *ds.Node[regex.ASTNodeData], counter *int, content string) 
 //	│  {firstpos}  │  {lastpos}   │
 //	│  sym         │  T / F       │
 //	└──────────────────────────────┘
-func astNodeLabel(data regex.ASTNodeData) string {
+func astNodeLabel(data parser.ASTNodeData) string {
 	firstStr := formatPosSet(data.FirstPos)
 	lastStr := formatPosSet(data.LastPos)
 	sym := htmlEscape(displaySymbol(data.Value))

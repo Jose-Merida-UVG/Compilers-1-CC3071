@@ -1,0 +1,5 @@
+let a = '\\'  (* this is: quote, backslash, backslash, quote = backslash char *)
+let b = '\''  (* quote, escaped quote, quote = single quote char *)
+let c = '\n'  (* quote, backslash, n, quote = newline char *)
+rule test =
+  'a' { return A }

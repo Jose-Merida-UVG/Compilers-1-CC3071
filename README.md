@@ -1,68 +1,83 @@
-# Direct Regex to DFA Compiler
+# YALex - Yet Another Lexical Analyzer Generator
 
-A Go implementation that converts regular expressions directly to Deterministic Finite Automata (DFA) using syntax tree algorithms—no intermediate NFA required.
+A Go implementation of a lexical analyzer generator inspired by Lex and OCamllex. YALex reads lexer specification files (`.yal`) and generates scanners using direct DFA construction algorithms.
 
 ## What It Does
 
-This compiler implements the **direct DFA construction algorithm** from formal language theory:
-1. Parse a regex string and convert it to postfix notation
-2. Build an augmented syntax tree with position attributes (nullable, firstPos, lastPos)
-3. Compute the followPos table from the tree structure
-4. Construct a DFA directly using position sets as states
-5. Simulate and visualize the DFA against test strings
+YALex implements a complete lexical analyzer generator pipeline:
+1. Parse `.yal` specification files (similar to Lex format)
+2. Extract regex patterns, let definitions, and token rules
+3. Convert regular expressions directly to DFAs using syntax tree algorithms
+4. Generate scanner code for token recognition
+5. Visualize DFA state machines
 
 ## Quick Start
 
 ### Build
 ```bash
-go build -o bin/main cmd/main.go
+go build -o bin/yalex main.go
 ```
 
 ### Run
 ```bash
-./bin/main
+./bin/yalex <file.yal>
 ```
 
-Reads regexes from `data/regex.txt`, constructs their DFAs, runs test simulations, and generates visualization graphs in `out/`.
+Or run without arguments to test with the default example:
+```bash
+./bin/yalex
+```
 
-## Test Examples
+Reads lexer specifications from `.yal` files and displays the parsed structure.
 
-The project includes 3 test regexes:
+## YALex File Format
 
-**Regex 1: `a+b|c*`** (one or more a's + b, OR zero or more c's)
-- ✓ `aaaab` → matches
-- ✓ `ccc` → matches  
-- ✗ `aaabb` → no match
-- ✗ `acb` → no match
+YALex files (`.yal`) follow this structure:
 
-**Regex 2: `(a|b)*cd?`** (zero or more a/b, then c, optional d)
-- ✓ `bababacd` → matches
-- ✓ `c` → matches
-- ✗ `ababab` → no match
-- ✗ `abcdc` → no match
+```
+(* comments *)
+{ header }                    (* optional: code copied to output *)
+let ident = regexp ...        (* optional: named regex definitions *)
+rule entrypoint =             (* required: lexer rules *)
+  pattern { action }
+| pattern { action }
+...
+{ trailer }                   (* optional: helper code *)
+```
 
-**Regex 3: `a?(b|c)*d*e`** (optional a, zero or more b/c, zero or more d, then e)
-- ✓ `abcbcddde` → matches
-- ✓ `bcce` → matches
-- ✗ `abcbcd` → no match
-- ✗ `aabce` → no match
+### Example
 
-## Where to Find Everything
+```
+{
+import myToken
+}
+let digit = ['0'-'9']
+rule gettoken =
+  [' ' '\t']+ { return lexbuf }
+| digit+      { return int(lxm) }
+| '+'         { return PLUS }
+| eof         { raise('EOF') }
+```
+
+## Project Structure
 
 | Directory | Purpose |
 |-----------|---------|
-| `cmd/main.go` | Entry point |
-| `internal/regex/` | Regex parsing (shunting yard, syntax tree) |
-| `internal/automata/` | DFA construction & simulation |
-| `internal/ds/` | Data structures (stack, tree) |
-| `internal/graph/` | Graphviz visualization |
-| `data/regex.txt` | Input test regexes |
-| `out/` | Generated DFA & AST graphs (PDF) |
+| `main.go` | Entry point - YALex file parser |
+| `parser/` | YALex file parsing & regex processing |
+| `automata/` | Direct DFA construction & minimization |
+| `graph/` | Graphviz DFA/AST visualization |
+| `ds/` | Data structures (stack, tree) |
+| `data/` | Example `.yal` specification files |
+| `out/` | Generated DFA graphs (PDF) |
 
-## Output
+## Current Status
 
-- **Console**: Transition tables and test results
-- **Files** (`out/`): PDF diagrams of syntax trees and DFA state machines
+✅ YALex file parsing (header, let definitions, rules, trailer)  
+✅ Regex to DFA direct construction algorithm  
+✅ DFA minimization  
+✅ DFA visualization (Graphviz PDF output)  
+🚧 Scanner code generation (in progress)
 
 ## Requirements
 

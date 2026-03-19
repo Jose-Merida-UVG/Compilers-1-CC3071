@@ -109,6 +109,7 @@ func MinimizeRecursive(alphabet map[rune]bool, partitions [][]*DFAState) [][]*DF
 	}
 
 	// Refine each partition based on transition behavior
+	// abcd
 	for _, partition := range partitions {
 		hashToStates := make(map[string][]*DFAState)
 

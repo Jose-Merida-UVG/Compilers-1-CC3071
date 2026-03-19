@@ -66,10 +66,54 @@ func main() {
 		fmt.Printf("Transitions: %d\n", minDFA.CountTransitions())
 		minDFA.PrintTransitionTable()
 
+		// Simulation on test strings
+		fmt.Println("\n--- Simulación de Cadenas ---")
+		testStrings := getTestStrings(regexNum)
+		for _, testStr := range testStrings {
+			dfaResult := dfa.Sim(testStr.String)
+			minDfaResult := minDFA.Sim(testStr.String)
+			fmt.Printf("\nCadena: \"%s\" (Expected: %v)\n", testStr.String, testStr.Expected)
+			fmt.Printf("  DFA:     %v\n", dfaResult)
+			fmt.Printf("  MinDFA:  %v\n", minDfaResult)
+			if dfaResult == minDfaResult {
+				fmt.Printf("  ✓ Resultados coinciden\n")
+			} else {
+				fmt.Printf("  ✗ ERROR: Resultados NO coinciden\n")
+			}
+		}
+
 		regexNum++
 	}
 
 	if err := scanner.Err(); err != nil {
 		fmt.Printf("Error reading file: %v\n", err)
+	}
+}
+
+// Helper struct to define test strings
+type TestString struct {
+	String   string
+	Expected bool
+}
+
+// Get test strings for each regex (2 per regex: 1 that belongs, 1 that doesn't)
+func getTestStrings(regexNum int) []TestString {
+	switch regexNum {
+	case 1:
+		// Regex 1: (a|b)*cd?
+		return []TestString{
+			{String: "bababac", Expected: true},  // belongs: (a|b)* then c then no d
+			{String: "bababacd", Expected: true}, // belongs: (a|b)* then c then d
+			{String: "ababdcd", Expected: false}, // doesn't belong: d appears before c
+		}
+	case 2:
+		// Regex 2: (a|b)*abb(a|b)*
+		return []TestString{
+			{String: "babababbababab", Expected: true}, // belongs: contains abb in middle
+			{String: "abbbbbbbbbbbb", Expected: true},  // belongs: abb at start, rest is (a|b)*
+			{String: "bababababab", Expected: false},   // doesn't belong: no abb substring
+		}
+	default:
+		return []TestString{}
 	}
 }

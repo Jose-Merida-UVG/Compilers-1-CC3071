@@ -1,15 +1,26 @@
 # Direct Regex to DFA Compiler
 
-A Go implementation that converts regular expressions directly to Deterministic Finite Automata (DFA) using syntax tree algorithms—no intermediate NFA required.
+A Go implementation that converts regular expressions directly to Deterministic Finite Automata (DFA) using syntax tree algorithms—no intermediate NFA required. Includes DFA minimization and comprehensive test simulation.
+
+## Video Demos
+
+**Direct Method (DFA Construction)**
+> [Add video link here]
+
+**State Minimization**
+> [Add video link here]
 
 ## What It Does
 
-This compiler implements the **direct DFA construction algorithm** from formal language theory:
-1. Parse a regex string and convert it to postfix notation
-2. Build an augmented syntax tree with position attributes (nullable, firstPos, lastPos)
-3. Compute the followPos table from the tree structure
-4. Construct a DFA directly using position sets as states
-5. Simulate and visualize the DFA against test strings
+This compiler implements the **direct DFA construction algorithm** with state minimization:
+
+1. **Parse & Normalize**: Convert regex string to postfix notation with special operator handling
+2. **Build Syntax Tree**: Create augmented syntax tree with position attributes (nullable, firstPos, lastPos)
+3. **Compute Tables**: Generate followPos table and direct transition table
+4. **Construct DFA**: Build DFA directly from position sets as states
+5. **Minimize States**: Apply partition refinement algorithm to minimize the DFA
+6. **Simulate & Test**: Run test strings against both regular and minimized DFAs
+7. **Visualize**: Generate PDF diagrams of DFA state machines
 
 ## Quick Start
 
@@ -23,48 +34,82 @@ go build -o bin/main cmd/main.go
 ./bin/main
 ```
 
-Reads regexes from `data/regex.txt`, constructs their DFAs, runs test simulations, and generates visualization graphs in `out/`.
+Reads regexes from `data/regex.txt`, constructs DFAs, minimizes them, runs test simulations, and generates visualization graphs in `out/`.
+
+## Current Functionality
+
+The compiler processes each regex and outputs:
+
+- **Postfix notation** with end marker
+- **Regular DFA**: Complete state transition table
+- **Minimized DFA**: Reduced state version using partition refinement
+- **Test Simulations**: For each regex, 2+ test cases showing:
+  - Strings that belong to the language ✓
+  - Strings that don't belong to the language ✗
+  - Verification that DFA and MinDFA produce identical results
+- **Visualization**: PDF graphs for both DFA and MinDFA in `out/`
 
 ## Test Examples
 
-The project includes 3 test regexes:
+### Regex 1: `(a|b)*cd?`
+Matches: zero or more a/b, then mandatory 'c', optional 'd'
 
-**Regex 1: `a+b|c*`** (one or more a's + b, OR zero or more c's)
-- ✓ `aaaab` → matches
-- ✓ `ccc` → matches  
-- ✗ `aaabb` → no match
-- ✗ `acb` → no match
+| Input | Expected | DFA | MinDFA | Status |
+|-------|----------|-----|--------|--------|
+| `bababac` | ✓ | ✓ | ✓ | Pass |
+| `bababacd` | ✓ | ✓ | ✓ | Pass |
+| `ababdcd` | ✗ | ✗ | ✗ | Pass |
 
-**Regex 2: `(a|b)*cd?`** (zero or more a/b, then c, optional d)
-- ✓ `bababacd` → matches
-- ✓ `c` → matches
-- ✗ `ababab` → no match
-- ✗ `abcdc` → no match
+### Regex 2: `(a|b)*abb(a|b)*`
+Matches: any string containing 'abb' as a substring
 
-**Regex 3: `a?(b|c)*d*e`** (optional a, zero or more b/c, zero or more d, then e)
-- ✓ `abcbcddde` → matches
-- ✓ `bcce` → matches
-- ✗ `abcbcd` → no match
-- ✗ `aabce` → no match
+| Input | Expected | DFA | MinDFA | Status |
+|-------|----------|-----|--------|--------|
+| `babababbababab` | ✓ | ✓ | ✓ | Pass |
+| `abbbbbbbbbbbb` | ✓ | ✓ | ✓ | Pass |
+| `bababababab` | ✗ | ✗ | ✗ | Pass |
 
-## Where to Find Everything
+## Architecture
 
 | Directory | Purpose |
 |-----------|---------|
-| `cmd/main.go` | Entry point |
-| `internal/regex/` | Regex parsing (shunting yard, syntax tree) |
-| `internal/automata/` | DFA construction & simulation |
-| `internal/ds/` | Data structures (stack, tree) |
+| `cmd/main.go` | Entry point - orchestrates regex processing, DFA construction, minimization, and test simulation |
+| `internal/regex/` | Regex parsing (shunting yard, syntax tree, balanced parentheses) |
+| `internal/automata/` | DFA construction, minimization, and simulation |
+| `internal/ds/` | Data structures (stack, tree node) |
 | `internal/graph/` | Graphviz visualization |
 | `data/regex.txt` | Input test regexes |
-| `out/` | Generated DFA & AST graphs (PDF) |
+| `out/` | Generated DFA & MinDFA graphs (PDF) |
 
 ## Output
 
-- **Console**: Transition tables and test results
-- **Files** (`out/`): PDF diagrams of syntax trees and DFA state machines
+### Console Output
+- Postfix notation representation
+- DFA state count and transition count
+- MinDFA state count and transition count (typically fewer states)
+- Transition tables for both DFA and MinDFA
+- Test simulation results comparing expected vs actual
+
+### Generated Files
+- `out/DFA_regex#.pdf` - Visualization of the complete DFA
+- `out/MinDFA_regex#.pdf` - Visualization of the minimized DFA
+
+## How It Works
+
+### Direct DFA Construction
+The algorithm builds a DFA directly from a regex without constructing an NFA first:
+- Position attributes (nullable, firstPos, lastPos) are computed bottom-up on the syntax tree
+- The followPos function determines which positions can follow each position
+- States in the DFA represent sets of positions from the original regex
+
+### State Minimization
+Uses partition refinement algorithm:
+- Initial partitions separate accepting and non-accepting states
+- Iteratively refines partitions based on transition behavior
+- Stops when no further refinement is possible
+- Typically reduces state count significantly (see test examples above)
 
 ## Requirements
 
 - Go 1.23.0+
-- Graphviz (for graph visualization)
+- Graphviz (for PDF graph visualization)

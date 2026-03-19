@@ -99,7 +99,6 @@ func partitionsAreEqual(p1, p2 [][]*DFAState) bool {
 }
 
 func MinimizeRecursive(alphabet map[rune]bool, partitions [][]*DFAState) [][]*DFAState {
-
 	newPartitions := [][]*DFAState{}
 	partitionLookup := make(map[int]int)
 

@@ -1,7 +1,0 @@
-digraph "graph" {
-	rankdir=LR size = "8,5"
-	node[shape=circle]
-	30 [label=0][shape=doublecircle]
-	30 -> 30 [label="a"]
-	30 -> 30 [label="b"]
-}

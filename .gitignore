@@ -1,0 +1,19 @@
+# Go binaries
+/bin/
+/build/
+*.exe
+*.test
+Compilers-1-CC3071
+
+# Frontend build output and deps
+frontend/dist/
+frontend/node_modules/
+frontend/package.json.md5
+
+# Logs
+*.log
+
+# Workspace generated files (keep specs/ and input/, ignore generated output)
+workspace/lexers/*.dfa
+workspace/lexers/*.go
+workspace/output/

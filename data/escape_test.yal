@@ -1,5 +1,0 @@
-let a = '\\'
-let b = '\''
-let c = "\""
-rule test =
-  'a' { return A }

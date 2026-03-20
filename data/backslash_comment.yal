@@ -1,3 +1,0 @@
-(* Backslash in comment test: \* this should work *)
-rule test =
-  'a' { return A }

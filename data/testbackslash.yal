@@ -1,3 +1,0 @@
-let a = '\\'
-rule test =
-  'a' { return A }

@@ -1,3 +1,0 @@
-let a = '\'  (* single backslash - should this work? *)
-rule test =
-  'a' { return A }

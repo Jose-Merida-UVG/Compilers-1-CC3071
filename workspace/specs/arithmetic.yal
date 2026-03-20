@@ -1,0 +1,22 @@
+(* Arithmetic expression lexer *)
+{
+  (* Header: Go code injected at the top of generated output *)
+}
+
+let digit   = ['0'-'9']
+let int     = digit+
+let float   = digit+ '.' digit+
+let ws      = [' ' '\t' '\n' '\r']
+
+rule gettoken =
+  ws+                     { (* skip whitespace *) }
+| float                   { return FLOAT }
+| int                     { return INT }
+| '+'                     { return PLUS }
+| '-'                     { return MINUS }
+| '*'                     { return TIMES }
+| '/'                     { return DIV }
+| '%'                     { return MOD }
+| '('                     { return LPAREN }
+| ')'                     { return RPAREN }
+| eof                     { raise EOF }

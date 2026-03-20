@@ -1,0 +1,67 @@
+package main
+
+import (
+	"embed"
+	"io/fs"
+	"log"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+//go:embed frontend/dist
+var frontendDist embed.FS
+
+func main() {
+	workspace, _ := filepath.Abs("workspace")
+	for _, sub := range []string{"", "specs", "lexers", "input", "output"} {
+		os.MkdirAll(filepath.Join(workspace, sub), 0o755)
+	}
+
+	mux := http.NewServeMux()
+	registerHandlers(mux, workspace)
+
+	// Serve React SPA from embedded frontend/dist
+	distFS, err := fs.Sub(frontendDist, "frontend/dist")
+	if err != nil {
+		log.Fatal(err)
+	}
+	mux.Handle("/", spaHandler(http.FS(distFS)))
+
+	addr := ":8080"
+	log.Printf("YALex → http://localhost%s", addr)
+	log.Fatal(http.ListenAndServe(addr, corsMiddleware(mux)))
+}
+
+// spaHandler serves static files and falls back to index.html for client-side routing.
+func spaHandler(fsys http.FileSystem) http.Handler {
+	fileServer := http.FileServer(fsys)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Only fall back for non-API paths that are missing
+		if !strings.HasPrefix(r.URL.Path, "/api") {
+			f, err := fsys.Open(r.URL.Path)
+			if err != nil {
+				r.URL.Path = "/"
+			} else {
+				f.Close()
+			}
+		}
+		fileServer.ServeHTTP(w, r)
+	})
+}
+
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api") {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}

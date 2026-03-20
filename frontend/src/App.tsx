@@ -1,0 +1,215 @@
+import { useState, useCallback, useEffect, useRef } from "react";
+import FileExplorer from "./components/Sidebar/FileExplorer";
+import EditorPane from "./components/Editor/EditorPane";
+import TerminalPane from "./components/Terminal/TerminalPane";
+import StatusBar from "./components/StatusBar/StatusBar";
+import type { FileNode, DFAGraphData, EditorTab } from "./types";
+import { api } from "./api";
+import "./App.css";
+
+export default function App() {
+  const [fileTree, setFileTree] = useState<FileNode[]>([]);
+  const [tabs, setTabs] = useState<EditorTab[]>([]);
+  const [activeTab, setActiveTab] = useState<string | null>(null);
+  const [terminalLines, setTerminalLines] = useState<string[]>(["YALex ready."]);
+  const [terminalHeight, setTerminalHeight] = useState(200);
+  const resizing = useRef(false);
+  const resizeStartY = useRef(0);
+  const resizeStartH = useRef(0);
+
+  const appendTerminal = useCallback((line: string) => {
+    setTerminalLines((prev) => [...prev, line]);
+  }, []);
+
+  const refreshTree = useCallback(async () => {
+    try {
+      const tree = await api.listDirectory();
+      setFileTree(tree);
+    } catch (e: any) {
+      appendTerminal(`Error refreshing tree: ${e.message}`);
+    }
+  }, [appendTerminal]);
+
+  useEffect(() => { refreshTree(); }, []);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!resizing.current) return;
+      const delta = resizeStartY.current - e.clientY;
+      const next = Math.max(60, Math.min(resizeStartH.current + delta, window.innerHeight * 0.75));
+      setTerminalHeight(next);
+    };
+    const onUp = () => { resizing.current = false; document.body.style.cursor = ""; };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+  }, []);
+
+  const onResizeStart = useCallback((e: React.MouseEvent) => {
+    resizing.current = true;
+    resizeStartY.current = e.clientY;
+    resizeStartH.current = terminalHeight;
+    document.body.style.cursor = "ns-resize";
+    e.preventDefault();
+  }, [terminalHeight]);
+
+  // ── File ops ────────────────────────────────────────────────────────────────
+  const openFile = useCallback(async (node: FileNode) => {
+    if (node.isDir) return;
+    const existing = tabs.find((t) => t.path === node.path);
+    if (existing) { setActiveTab(node.path); return; }
+    try {
+      const content = await api.readFile(node.path);
+      // Parse .dfa.json files as DFA graph data — rendered as DFA viewer, not Monaco.
+      let dfaData: DFAGraphData | undefined;
+      let label = node.name;
+      if (node.path.endsWith(".dfa")) {
+        try { dfaData = JSON.parse(content) as DFAGraphData; } catch { /* fall through */ }
+        label = node.name.replace(/\.dfa$/, ""); // show just the spec name
+      }
+      setTabs((prev) => [...prev, { path: node.path, label, content, isDirty: false, dfaData }]);
+      setActiveTab(node.path);
+    } catch (e: any) {
+      appendTerminal(`Error opening ${node.path}: ${e.message}`);
+    }
+  }, [tabs, appendTerminal]);
+
+  const closeTab = useCallback((path: string) => {
+    setTabs((prev) => {
+      const next = prev.filter((t) => t.path !== path);
+      setActiveTab((cur) => {
+        if (cur !== path) return cur;
+        return next.length > 0 ? next[next.length - 1].path : null;
+      });
+      return next;
+    });
+  }, []);
+
+  const updateTabContent = useCallback((path: string, content: string) => {
+    setTabs((prev) => prev.map((t) => t.path === path ? { ...t, content, isDirty: true } : t));
+  }, []);
+
+  const saveTab = useCallback(async (path: string) => {
+    const tab = tabs.find((t) => t.path === path);
+    if (!tab || tab.dfaData || tab.path.endsWith(".dfa")) return; // DFA tabs are read-only
+    try {
+      await api.writeFile(path, tab.content);
+      setTabs((prev) => prev.map((t) => t.path === path ? { ...t, isDirty: false } : t));
+      appendTerminal(`Saved ${path}`);
+      await refreshTree(); // file may be new; keep explorer in sync
+    } catch (e: any) {
+      appendTerminal(`Save error: ${e.message}`);
+    }
+  }, [tabs, appendTerminal, refreshTree]);
+
+  // ── DFA ─────────────────────────────────────────────────────────────────────
+  // Builds the DFA, which also saves output/<name>.dfa.json and lexers/<name>.go.
+  // Then opens the resulting .dfa.json as a tab in the main window.
+  const buildDFA = useCallback(async (yalPath: string) => {
+    appendTerminal(`Building DFA from ${yalPath}…`);
+    try {
+      const data = await api.getDFA(yalPath);
+      appendTerminal(`DFA built: ${data.nodes.length} states, ${data.edges.length} transitions.`);
+
+      // Derive artifact names, e.g. "specs/arithmetic.yal" → "arithmetic"
+      const base = yalPath.split("/").pop()?.replace(/\.yal$/, "") ?? "unknown";
+      const dfaPath = `lexers/${base}.dfa`;
+      const goPath  = `lexers/${base}.go`;
+
+      // Await the tree refresh so output/ and lexers/ are visible immediately.
+      await refreshTree();
+
+      // Read the generated .go source so we can open it as a tab.
+      let goContent = `// lexers/${base}.go — run Build to generate.`;
+      try { goContent = await api.readFile(goPath); } catch { /* generated after getDFA */ }
+
+      // Open/refresh both the DFA viewer tab and the generated Go source tab.
+      setTabs((prev) => {
+        const upsert = (arr: EditorTab[], tab: EditorTab) => {
+          const idx = arr.findIndex((t) => t.path === tab.path);
+          if (idx >= 0) { const n = [...arr]; n[idx] = tab; return n; }
+          return [...arr, tab];
+        };
+        // DFA tab label is just the spec name — no extension clutter.
+        let next = upsert(prev, {
+          path: dfaPath, label: base, content: "", isDirty: false, dfaData: data,
+        });
+        next = upsert(next, {
+          path: goPath, label: `${base}.go`, content: goContent, isDirty: false,
+        });
+        return next;
+      });
+      setActiveTab(dfaPath);
+    } catch (e: any) {
+      appendTerminal(`DFA error: ${e.message}`);
+    }
+  }, [appendTerminal, refreshTree]);
+
+  // ── Lexer ────────────────────────────────────────────────────────────────────
+  const runFile = useCallback(async (inputPath: string) => {
+    const tab = tabs.find((t) => t.path === inputPath);
+    if (tab?.isDirty) {
+      try {
+        await api.writeFile(inputPath, tab.content);
+        setTabs((prev) => prev.map((t) => t.path === inputPath ? { ...t, isDirty: false } : t));
+      } catch (e: any) {
+        appendTerminal(`Save error: ${e.message}`);
+        return;
+      }
+    }
+
+    const ext = inputPath.split(".").pop() ?? "";
+    appendTerminal(`\n▶ Running ${inputPath} → specs/${ext}.yal`);
+    try {
+      const result = await api.runLexer(inputPath);
+      (result.lines ?? []).forEach((l) => appendTerminal(l));
+      appendTerminal(`── output saved to output/${inputPath.split("/").pop()}.out ──`);
+      refreshTree();
+    } catch (e: any) {
+      appendTerminal(`Error: ${e.message}`);
+    }
+  }, [tabs, appendTerminal, refreshTree]);
+
+  const activeTabData = tabs.find((t) => t.path === activeTab) ?? null;
+  const isYAL = activeTab?.endsWith(".yal") ?? false;
+  const isInput = activeTab?.startsWith("input/") ?? false;
+
+  return (
+    <div className="app-shell">
+      <aside className="sidebar">
+        <FileExplorer
+          tree={fileTree}
+          activeFile={activeTab}
+          onOpenFile={openFile}
+          onRefresh={refreshTree}
+          appendTerminal={appendTerminal}
+          refreshTree={refreshTree}
+        />
+      </aside>
+
+      <div className="main-area">
+        <EditorPane
+          tabs={tabs}
+          activeTab={activeTab}
+          onSelectTab={setActiveTab}
+          onCloseTab={closeTab}
+          onChangeContent={updateTabContent}
+          onSave={saveTab}
+          onBuildDFA={isYAL ? buildDFA : undefined}
+          onRunFile={isInput ? runFile : undefined}
+        />
+        <div className="resize-handle" onMouseDown={onResizeStart} />
+        <TerminalPane
+            lines={terminalLines}
+            onClear={() => setTerminalLines([])}
+            height={terminalHeight}
+          />
+      </div>
+
+      <StatusBar
+        activeFile={activeTabData?.path ?? null}
+        isDirty={activeTabData?.isDirty ?? false}
+      />
+    </div>
+  );
+}

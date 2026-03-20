@@ -1,3 +1,0 @@
-let a = "\""   (* this is: quote, backslash-quote, quote *)
-rule test =
-  '"' { return QUOTE }

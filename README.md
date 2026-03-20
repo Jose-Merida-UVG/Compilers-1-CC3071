@@ -1,230 +1,87 @@
 # YALex — Lexer Generator
 
-A web-based lexer generator. You write a `.yal` spec file, click **Build** in the
-UI, and get back a visual DFA diagram plus a generated Go lexer ready for the
-parser phase.
+You write a `.yal` spec, click **Build** in the UI, and get a visual DFA you can
+pan/zoom and a generated Go lexer file ready for the parser phase.
+
+---
+
+## What's Already Done
+
+- Full `.yal` file parser — header, `let` definitions, rules, trailer, nested comments
+- `let` identifier expansion (transitive, so `alnum = letter | digit` works)
+- Regex pipeline: char classes, escapes, wildcards, `eof`, `+`, `?`, `*`, `|`, grouping
+- Direct DFA construction + Hopcroft minimization
+- Multi-pattern merge with first-rule-wins priority and per-token IDs
+- Interactive DFA viewer in the browser (Graphviz WASM, pan/zoom, hover labels)
+- HTTP server with file workspace (read, write, create, delete, rename)
+- "Run Lexer" endpoint — greedy longest-match scan, outputs token list
+
+## What's Left to Implement
+
+### Code generation (`internal/codegen/codegen.go`)
+
+This is **the main thing that needs to be built.** The function signature is:
+
+```go
+func GenerateLexer(name, sourcePath string, dfa *automata.DFA, actions []string) string
+```
+
+It returns the full text of a Go source file. The server already calls it and
+writes the result to `workspace/lexers/<name>.go` — you just need to fill in the function.
+
+Everything you need is in `dfa`:
+
+```go
+dfa.GetAllStates()         // []*DFAState
+dfa.StartState             // the start state
+
+// Each state:
+state.ID                   // int
+state.Accept               // bool
+state.TokenID              // 1-based index into actions[] (0 = not accepting)
+state.Transitions          // map[rune]*DFAState
+
+actions[tokenID - 1]       // the raw action string from the .yal file
+                           // e.g. "return PLUS", "return int(lxm)"
+```
+
+The generated file must:
+- Be in `package lexers`
+- Export `func <Name>Lex(input string) []Token`
+- Track **line and column** as it scans
+- Use **longest match** (maximal munch)
+- Emit an error token for unrecognized characters rather than panicking
+
+A `Token` should look roughly like this — you can adjust:
+
+```go
+type Token struct {
+    Kind   int    // TokenID from the DFA (1-based). -1 for errors.
+    Lexeme string // the matched text  (yytext)
+    Value  any    // semantic value    (yyval) — set by action logic, can be nil
+    Line   int    // 1-based line where the token starts
+    Col    int    // 1-based column where the token starts
+}
+```
 
 ---
 
 ## Project Layout
 
 ```
-.
-├── main.go                      Entry point — HTTP server on :8080
-├── handlers.go                  API route handlers (file I/O, DFA build, lexer run)
-├── Makefile                     Build / dev targets
-│
-├── internal/
-│   ├── yalex/
-│   │   ├── yalex.go             Types: YalFile, Rule, LetDefinition, RulePattern
-│   │   ├── scanner.go           Comment stripping, ASCII validation, section detection
-│   │   └── compile.go           let-def expansion + DFA compilation orchestration
-│   │
-│   ├── regex/
-│   │   ├── regexstring.go       Token types; sentinel runes (RuneEOF, RuneEndMarker)
-│   │   ├── normalize.go         YALex syntax  →  flat token stream
-│   │   │                          'c'  "str"  ['a'-'z']  [^set]  _ (wildcard)  eof
-│   │   ├── shuntingyard.go      Infix → postfix (RPN) conversion
-│   │   ├── syntaxtree.go        AST node construction from postfix
-│   │   └── regex.go             Preprocess() pipeline entry point
-│   │
-│   ├── automata/
-│   │   ├── dfa.go               DFAState / DFA types; SetToken(), Alphabet(), Sim()
-│   │   ├── direct.go            Direct DFA construction from regex AST
-│   │   ├── compile.go           Compile() (one regex → DFA) + Merge() (N DFAs → one)
-│   │   └── minimization.go      Hopcroft-style DFA minimization
-│   │
-│   ├── codegen/
-│   │   └── codegen.go           *** YOUR CODE GOES HERE — see section below ***
-│   │
-│   ├── graph/
-│   │   └── graph.go             SerializeDFA — DFA → JSON for the frontend viewer
-│   │
-│   └── ds/
-│       ├── stack.go             Generic stack
-│       └── tree.go              Generic tree node (used for the regex AST)
-│
-├── frontend/                    React + Vite UI
-│   ├── src/
-│   │   ├── components/
-│   │   │   └── DFAViewer/       Interactive DFA graph (Graphviz WASM, pan/zoom)
-│   │   └── types/index.ts       TypeScript mirrors of the Go API types
-│   └── vite.config.ts
-│
-└── workspace/                   Runtime user files (not committed)
-    ├── specs/                   .yal spec files go here
-    ├── lexers/                  Generated output: <name>.go + <name>.dfa.json
-    └── input/                   Test input files for the "Run Lexer" feature
-```
+internal/
+  yalex/       .yal parsing + let-def expansion + compilation orchestration
+  regex/       pattern normalization, shunting-yard, AST construction
+  automata/    direct DFA construction, merge, Hopcroft minimization
+  codegen/     ← your work goes here
+  graph/       DFA → JSON for the frontend viewer
+  ds/          generic stack and tree node
 
----
-
-## How the Pipeline Works
-
-```
-.yal file
-   │
-   ▼
-yalex.ParseYalContent()          Parse: header, let-defs, rules, trailer
-   │
-   ▼
-YalFile.Compile()                For each rule pattern:
-   │  ├─ expandDefinitions()       Substitute let-identifiers (transitive, word-boundary)
-   │  ├─ regex.Preprocess()
-   │  │     ├─ NormalizePattern    YALex syntax → token stream
-   │  │     ├─ HandleSpecialOps    +  →  xx*     ?  →  (x|ε)
-   │  │     ├─ ExplicitConcat      insert ~ concatenation tokens
-   │  │     ├─ ShuntingYard        infix → postfix
-   │  │     └─ AppendEndMarker     append # end-marker
-   │  ├─ automata.Compile()        direct DFA construction + minimize  (one per pattern)
-   │  └─ automata.Merge()          merge all pattern DFAs into one minimized DFA
-   │                               first-rule-wins priority; TokenID = pattern index (1-based)
-   ▼
-CompiledLexer { DFA, Actions[] }
-   │
-   ├──▶  graph.SerializeDFA()      → JSON sent to browser → DFA Viewer
-   │
-   └──▶  codegen.GenerateLexer()   → workspace/lexers/<name>.go   ← implement this
-```
-
----
-
-## What You Need to Implement
-
-**File:** `internal/codegen/codegen.go`
-
-The stub is already there with a full doc comment. The function signature is:
-
-```go
-func GenerateLexer(name, sourcePath string, dfa *automata.DFA, actions []string) string
-```
-
-Return the complete text of a Go source file. The handler writes it to
-`workspace/lexers/<name>.go` — you don't need to touch anything else.
-
-### DFA data you get
-
-```go
-states := dfa.GetAllStates()   // []*automata.DFAState
-
-state.ID                        // unique int
-state.Accept                    // true on accepting states
-state.TokenID                   // 1-based token index (0 on non-accept states)
-state.Transitions               // map[rune]*DFAState
-
-dfa.StartState                  // *DFAState — the initial state
-
-actions[tokenID - 1]            // raw action string for that token
-                                // e.g. "return PLUS", "return int(lxm)"
-```
-
-### Output file contract
-
-The generated file must be in `package lexers` and export:
-
-```go
-func <Name>Lex(input string) []Token
-```
-
-`Token` should be defined in the generated file (or shared in `workspace/lexers/tokens.go`):
-
-```go
-type Token struct {
-    Kind   int    // TokenID (1-based). Use -1 for error tokens.
-    Lexeme string // matched text         — yytext equivalent
-    Value  any    // semantic value       — yyval equivalent; nil until action sets it
-    Line   int    // 1-based line number where this token starts
-    Col    int    // 1-based column       where this token starts
-}
-```
-
-### Lexer behavior
-
-| Requirement | Details |
-|-------------|---------|
-| **Longest match** | Follow DFA transitions as far as possible; commit to the last accepting state seen (maximal munch). |
-| **Line tracking** | Increment `Line` on every `'\n'` consumed; reset `Col` to 1. |
-| **Column tracking** | Increment `Col` for every non-`'\n'` rune consumed. |
-| **Token position** | Record `Line`/`Col` at the *start* of the lexeme, before consuming it. |
-| **Error recovery** | If no accepting state was seen, emit `Token{Kind: -1, Lexeme: <current rune>}` and advance one rune. |
-| **Actions** | `actions[tokenID-1]` is user-supplied Go code. Embed it in a `switch` arm or inline it so the caller can dispatch on token kind. |
-
-### Lex utility checklist
-
-| Standard name | Maps to     | Notes                                             |
-|---------------|-------------|---------------------------------------------------|
-| `yytext`      | `Token.Lexeme` | The raw matched string                         |
-| `yyval`       | `Token.Value`  | Any semantic value; typed by the action        |
-| `yyline`      | `Token.Line`   | 1-based; updated on `'\n'`                     |
-| `yycol`       | `Token.Col`    | 1-based; reset to 1 after `'\n'`               |
-
-### Skeleton of a generated file
-
-```go
-// Code generated by YALex — DO NOT EDIT.
-// Source: specs/arithmetic.yal
-package lexers
-
-type Token struct {
-    Kind   int
-    Lexeme string
-    Value  any
-    Line   int
-    Col    int
-}
-
-// arithmeticTransitions[state][char] = nextState
-var arithmeticTransitions = map[int]map[rune]int{ /* ... populated by GenerateLexer */ }
-
-// arithmeticTokenID[state] = tokenID for accept states (0 = non-accept)
-var arithmeticTokenID = map[int]int{ /* ... */ }
-
-const arithmeticStart = 0
-
-func ArithmeticLex(input string) []Token {
-    var tokens []Token
-    runes := []rune(input)
-    pos, line, col := 0, 1, 1
-
-    for pos < len(runes) {
-        state := arithmeticStart
-        lastAccept, lastAcceptPos := -1, pos
-        startLine, startCol := line, col
-        cur := pos
-
-        for cur < len(runes) {
-            next, ok := arithmeticTransitions[state][runes[cur]]
-            if !ok { break }
-            state = next
-            if arithmeticTokenID[state] > 0 {
-                lastAccept, lastAcceptPos = arithmeticTokenID[state], cur+1
-            }
-            if runes[cur] == '\n' { line++; col = 1 } else { col++ }
-            cur++
-        }
-
-        if lastAccept < 0 {
-            tokens = append(tokens, Token{Kind: -1, Lexeme: string(runes[pos]),
-                Line: startLine, Col: startCol})
-            if runes[pos] == '\n' { line++; col = 1 } else { col++ }
-            pos++
-            continue
-        }
-
-        tok := Token{Kind: lastAccept, Lexeme: string(runes[pos:lastAcceptPos]),
-            Line: startLine, Col: startCol}
-
-        switch lastAccept {
-        case 1: /* action for token 1 */
-        case 2: /* action for token 2 */
-        // ...
-        }
-
-        tokens = append(tokens, tok)
-        pos = lastAcceptPos
-    }
-    return tokens
-}
+frontend/      React + Vite UI (DFA viewer, editor, file tree)
+workspace/     runtime user files
+  specs/       .yal files
+  lexers/      generated .go and .dfa.json files (output of Build)
+  input/       test input files
 ```
 
 ---
@@ -232,82 +89,61 @@ func ArithmeticLex(input string) []Token {
 ## Running Locally
 
 ```bash
-# First time: install frontend dependencies
-make frontend-install
-
-# Development mode (Go API on :8080, Vite dev server on :5173 with hot-reload)
-make dev
-
-# Production build (bundles frontend, compiles Go binary)
-make build
-./yalex
+make frontend-install   # first time only
+make dev                # Go API on :8080, Vite hot-reload on :5173
 ```
 
-Open `http://localhost:5173` in dev mode, or `http://localhost:8080` after a production build.
+Open `http://localhost:5173`. To do a production build: `make build && ./yalex`.
 
 ---
 
 ## .yal File Format
 
 ```
-(* optional comment *)
+(* comments use (* ... *) and can be nested *)
 {
-  Go import / preamble code  — copied verbatim into the generated file header
+  optional Go preamble — copied into generated file header
 }
 
 let digit  = ['0'-'9']
 let letter = ['a'-'z'] | ['A'-'Z']
-let alnum  = letter | digit
+let alnum  = letter | digit        (* transitive — this works *)
 
 rule gettoken =
-    [' ' '\t']    { return lexbuf }
-  | ['\n']        { return EOL }
-  | digit+        { return int(lxm) }
-  | '+'           { return PLUS }
-  | eof           { raise('End of input') }
+    [' ' '\t']   { return lexbuf }
+  | ['\n']       { return EOL }
+  | digit+       { return int(lxm) }
+  | '+'          { return PLUS }
+  | eof          { raise('End of input') }
 
 {
-  Go trailer code  — appended verbatim to the generated file
+  optional Go trailer — appended to generated file
 }
 ```
 
-**Pattern syntax:**
+Supported pattern syntax: `'c'`, `'\n'`/`'\t'`/`'\r'`/`'\\'`/`'\''`, `"string"`,
+`['a'-'z']`, `['a' 'b']`, `[^set]`, `[A] # [B]` (set diff), `_` (any printable ASCII),
+`eof`, `x*`, `x+`, `x?`, `x | y`, `(x)`.
 
-| Syntax           | Meaning                                        |
-|------------------|------------------------------------------------|
-| `'c'`            | Literal character                              |
-| `'\n'` `'\t'` …  | Escape sequences: `n t r \\ ' "`              |
-| `"hello"`        | String — characters matched in sequence        |
-| `['a'-'z']`      | Character range                                |
-| `['a' 'b' 'c']`  | Character list                                 |
-| `[^'0'-'9']`     | Negated class (all printable ASCII minus set)  |
-| `[A] # [B]`      | Set difference A − B                           |
-| `_`              | Wildcard — any printable ASCII character       |
-| `eof`            | End-of-buffer sentinel (rune U+E002)           |
-| `x*` `x+` `x?`  | Kleene / one-or-more / optional                |
-| `x \| y`         | Alternation                                    |
-| `(x)`            | Grouping                                       |
-
-**Priority:** the first rule whose pattern matches wins (standard lex behaviour).
+First matching rule wins.
 
 ---
 
-## API Reference
+## API Quick Reference
 
-All paths are relative to the `workspace/` directory.
+The frontend talks to the Go server over `/api/`. All file paths are relative to `workspace/`.
 
-| Method | Path                  | Body / Query         | Description                                      |
-|--------|-----------------------|----------------------|--------------------------------------------------|
-| GET    | `/api/health`         | —                    | Liveness check                                   |
-| GET    | `/api/workspace/tree` | —                    | Recursive directory listing of workspace         |
-| GET    | `/api/file`           | `?path=rel/path`     | Read a file                                      |
-| POST   | `/api/file`           | `{path, content}`    | Write / overwrite a file                         |
-| PUT    | `/api/file`           | `{path}`             | Create an empty file                             |
-| DELETE | `/api/file`           | `?path=rel/path`     | Delete file or directory                         |
-| POST   | `/api/file/rename`    | `{oldPath, newPath}` | Rename / move                                    |
-| PUT    | `/api/directory`      | `{path}`             | Create directory                                 |
-| POST   | `/api/dfa`            | `{path}`             | Parse .yal → build DFA → return graph JSON + write lexer .go |
-| POST   | `/api/lexer`          | `{inputPath}`        | Run lexer on an input file, return token list    |
+| Method | Path | What it does |
+|--------|------|--------------|
+| GET | `/api/workspace/tree` | Directory listing |
+| GET | `/api/file?path=...` | Read a file |
+| POST | `/api/file` `{path, content}` | Write a file |
+| PUT | `/api/file` `{path}` | Create empty file |
+| DELETE | `/api/file?path=...` | Delete file/dir |
+| POST | `/api/file/rename` `{oldPath, newPath}` | Rename/move |
+| PUT | `/api/directory` `{path}` | Create directory |
+| POST | `/api/dfa` `{path}` | Build DFA from .yal → returns graph JSON + writes lexer |
+| POST | `/api/lexer` `{inputPath}` | Run lexer on a file → returns token list |
 
-`POST /api/lexer` infers the spec from the input file extension:
-`input/test.arithmetic` → looks for `specs/arithmetic.yal`.
+`POST /api/lexer` infers the spec from the input file's extension:
+`input/test.arithmetic` → `specs/arithmetic.yal`.

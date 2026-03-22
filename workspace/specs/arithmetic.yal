@@ -1,6 +1,19 @@
 (* Arithmetic expression lexer *)
 {
   (* Header: Go code injected at the top of generated output *)
+  {
+    const (
+        WS     = 1
+        EOL    = 2
+        INT    = 3
+        PLUS   = 4
+        MINUS  = 5
+        TIMES  = 6
+        DIV    = 7
+        LPAREN = 8
+        RPAREN = 9
+    )
+    }
 }
 
 let digit   = ['0'-'9']

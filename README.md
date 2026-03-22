@@ -5,7 +5,7 @@ pan/zoom and a generated Go lexer file ready for the parser phase.
 
 ---
 
-## What's Already Done
+## What's Done
 
 - Full `.yal` file parser — header, `let` definitions, rules, trailer, nested comments
 - `let` identifier expansion (transitive, so `alnum = letter | digit` works)
@@ -15,54 +15,111 @@ pan/zoom and a generated Go lexer file ready for the parser phase.
 - Interactive DFA viewer in the browser (Graphviz WASM, pan/zoom, hover labels)
 - HTTP server with file workspace (read, write, create, delete, rename)
 - "Run Lexer" endpoint — greedy longest-match scan, outputs token list
+- **Code generation** (`internal/codegen/codegen.go`) — produces a standalone Go lexer file from the minimized DFA
 
-## What's Left to Implement
+---
 
-### Code generation (`internal/codegen/codegen.go`)
+## Code Generation
 
-This is **the main thing that needs to be built.** The function signature is:
+`GenerateLexer` in `internal/codegen/codegen.go` takes the minimized DFA and produces a
+complete, self-contained Go source file under `workspace/lexers/<name>.go`.
 
 ```go
 func GenerateLexer(name, sourcePath string, dfa *automata.DFA, actions []string) string
 ```
 
-It returns the full text of a Go source file. The server already calls it and
-writes the result to `workspace/lexers/<name>.go` — you just need to fill in the function.
+The server calls this automatically on every **Build** — you never invoke it directly.
 
-Everything you need is in `dfa`:
+### What the generated file contains
 
-```go
-dfa.GetAllStates()         // []*DFAState
-dfa.StartState             // the start state
+| Section | Description |
+|---|---|
+| `Token` struct | `Kind`, `Lexeme`, `Value`, `Line`, `Col` |
+| `<name>Trans` | Static DFA transition table: `map[int]map[rune]int` |
+| `<name>Accept` | Static accept table: `map[int]int` (stateID → 1-based TokenID) |
+| `yalexInt` | Helper that wraps `strconv.Atoi` — only emitted when `int(lxm)` is used |
+| `<Name>Lex` | Exported scanner function: `func <Name>Lex(input string) []Token` |
 
-// Each state:
-state.ID                   // int
-state.Accept               // bool
-state.TokenID              // 1-based index into actions[] (0 = not accepting)
-state.Transitions          // map[rune]*DFAState
+### How the scanner works
 
-actions[tokenID - 1]       // the raw action string from the .yal file
-                           // e.g. "return PLUS", "return int(lxm)"
+The generated `<Name>Lex` uses **maximal munch** (greedy longest match):
+
+1. From the current position, speculatively advance through the DFA following transitions.
+2. Every time an accepting state is reached, snapshot `(pos, line, col)` and the `TokenID`.
+3. When no transition exists, backtrack to the last snapshot and commit that match.
+4. Run the action for that `TokenID`, advance `pos` to the snapshot, repeat.
+5. If no accepting state was ever reached, emit an **error token** (`Kind: -1`) for the
+   single unrecognised character and keep scanning — never panics.
+
+Line and column are tracked incrementally during the speculative scan and restored from
+the snapshot on backtrack, so positions are always correct even after lookahead.
+
+### Action translation
+
+The `{action}` block in a `.yal` rule is translated to Go as follows:
+
+| `.yal` action | Generated Go |
+|---|---|
+| `return lexbuf` | `// skip` — lexeme consumed, no token emitted |
+| `return IDENT` | `Token{Kind: N, Lexeme: lxm, Value: IDENT, ...}` |
+| `return int(lxm)` | `Token{Kind: N, Lexeme: lxm, Value: yalexInt(lxm), ...}` |
+| `raise('...')` | Emits `Token{Kind: -2, ...}` then `return tokens` |
+| *(empty or comment)* | Falls through to default — emits a basic token, raw action as comment |
+
+`lxm` is a `string` variable in scope at every action site holding the matched text.
+Identifiers like `PLUS`, `EOL`, `FLOAT` must be defined in the `.yal` header block
+(or an imported package) so the generated file compiles.
+
+### Token Kind conventions
+
+| Kind | Meaning |
+|---|---|
+| `1..N` | 1-based index of the matching rule (first rule = 1) |
+| `-1` | Unrecognised character (scanner keeps going) |
+| `-2` | `raise(...)` — EOF or fatal condition, scanner stops |
+
+### Writing a `.yal` file that generates clean Go
+
 ```
-
-The generated file must:
-- Be in `package lexers`
-- Export `func <Name>Lex(input string) []Token`
-- Track **line and column** as it scans
-- Use **longest match** (maximal munch)
-- Emit an error token for unrecognized characters rather than panicking
-
-A `Token` should look roughly like this — you can adjust:
-
-```go
-type Token struct {
-    Kind   int    // TokenID from the DFA (1-based). -1 for errors.
-    Lexeme string // the matched text  (yytext)
-    Value  any    // semantic value    (yyval) — set by action logic, can be nil
-    Line   int    // 1-based line where the token starts
-    Col    int    // 1-based column where the token starts
+{
+const (
+    FLOAT  = 1   (* must match the rule order below — first rule = 1 *)
+    INT    = 2
+    IDENT  = 3
+    PLUS   = 4
+    (* ... *)
+)
 }
+
+let digit  = ['0'-'9']
+let letter = ['a'-'z'] | ['A'-'Z']
+
+rule gettoken =
+    [' ' '\t' '\n']  { return lexbuf }      (* skip — no token emitted *)
+  | digit+ '.' digit+ { return FLOAT }      (* float before int — longest match *)
+  | digit+            { return INT }
+  | letter (letter | digit)* { return IDENT }
+  | '+'               { return PLUS }
+  | eof               { raise('End of input') }
 ```
+
+Things to watch out for:
+
+- **Comments as actions** — `{ (* skip *) }` is stripped to an empty action before
+  codegen sees it. Use `{ return lexbuf }` to explicitly skip whitespace.
+- **`raise` syntax** — must be `raise('...')` with parentheses and a quoted string.
+  Bare `raise EOF` is not recognised.
+- **Constant names** — `PLUS`, `EOL`, etc. referenced in actions must be defined in the
+  header block. If they are missing the generated file will not compile.
+- **Rule order for overlapping patterns** — put longer/more-specific rules first
+  (e.g. `float` before `int`) since first-rule-wins applies when two patterns match
+  the same length.
+- **ASCII only** — the `.yal` parser rejects any character outside `0x20–0x7E`
+  (plus `\t`, `\n`, `\r`). Watch for em dashes (`—`) or curly quotes copied from
+  rich-text editors.
+- **Reserved Go identifiers as let names** — avoid names like `int`, `string`, `type`;
+  they are valid YALex identifiers but can confuse the word-boundary substitution in
+  `expandDefinitions`.
 
 ---
 
@@ -73,7 +130,7 @@ internal/
   yalex/       .yal parsing + let-def expansion + compilation orchestration
   regex/       pattern normalization, shunting-yard, AST construction
   automata/    direct DFA construction, merge, Hopcroft minimization
-  codegen/     ← your work goes here
+  codegen/     GenerateLexer — DFA + actions → Go source file
   graph/       DFA → JSON for the frontend viewer
   ds/          generic stack and tree node
 
@@ -134,7 +191,7 @@ First matching rule wins.
 The frontend talks to the Go server over `/api/`. All file paths are relative to `workspace/`.
 
 | Method | Path | What it does |
-|--------|------|--------------|
+|---|---|---|
 | GET | `/api/workspace/tree` | Directory listing |
 | GET | `/api/file?path=...` | Read a file |
 | POST | `/api/file` `{path, content}` | Write a file |

@@ -17,3 +17,5 @@ frontend/package.json.md5
 workspace/lexers/*.dfa
 workspace/lexers/*.go
 workspace/output/
+
+workspace/lexers/*

@@ -3,6 +3,7 @@ import type * as Monaco from "monaco-editor";
 import type { EditorTab } from "../../types";
 import { registerYALLanguage } from "../../lib/monaco-yal";
 import DFAViewer from "../DFAViewer/DFAViewer";
+import MarkdownViewer from "../MarkdownViewer/MarkdownViewer";
 import "./Editor.css";
 
 interface Props {
@@ -23,6 +24,7 @@ export default function EditorPane({
   const isYAL = activeTab?.endsWith(".yal") ?? false;
   const isInput = !!onRunFile;
   const isDFATab = !!(active?.dfaData);
+  const isMarkdown = activeTab?.endsWith(".md") ?? false;
 
   const handleBeforeMount = (monaco: typeof Monaco) => {
     registerYALLanguage(monaco);
@@ -46,7 +48,6 @@ export default function EditorPane({
               className={`tab ${tab.path === activeTab ? "active" : ""}`}
               onClick={() => onSelectTab(tab.path)}
             >
-              {tab.isDirty && <span className="tab__dot" />}
               <span className="tab__label">{tab.label}</span>
               <button
                 className="tab__close"
@@ -72,11 +73,6 @@ export default function EditorPane({
                 ▶ Run
               </button>
             )}
-            {!isDFATab && (
-              <button className="toolbar-pill" onClick={() => onSave(activeTab!)}>
-                ↓ Save
-              </button>
-            )}
           </div>
         </div>
       )}
@@ -86,6 +82,8 @@ export default function EditorPane({
         {active ? (
           active.dfaData ? (
             <DFAViewer data={active.dfaData} />
+          ) : isMarkdown ? (
+            <MarkdownViewer content={active.content} />
           ) : (
             <MonacoEditor
               height="100%"
@@ -129,7 +127,7 @@ function Welcome() {
       <div className="editor-welcome__badge">YALex</div>
       <p className="editor-welcome__sub">Lexical Analyzer Generator</p>
       <div className="editor-welcome__hints">
-        <Hint keys={["Ctrl", "S"]} label="Save file" />
+        <Hint keys={["Ctrl", "S"]} label="Force save (auto-saves after 800ms)" />
         <Hint keys={["◎ Build DFA"]} label="Generate automaton from .yal" />
         <Hint keys={["▶ Run"]} label="Test lexer on input" />
       </div>

@@ -16,6 +16,7 @@ export default function App() {
   const resizing = useRef(false);
   const resizeStartY = useRef(0);
   const resizeStartH = useRef(0);
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const appendTerminal = useCallback((line: string) => {
     setTerminalLines((prev) => [...prev, line]);
@@ -87,6 +88,13 @@ export default function App() {
 
   const updateTabContent = useCallback((path: string, content: string) => {
     setTabs((prev) => prev.map((t) => t.path === path ? { ...t, content, isDirty: true } : t));
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(async () => {
+      try {
+        await api.writeFile(path, content);
+        setTabs((prev) => prev.map((t) => t.path === path ? { ...t, isDirty: false } : t));
+      } catch { /* silent — user can still Ctrl+S manually */ }
+    }, 200);
   }, []);
 
   const saveTab = useCallback(async (path: string) => {

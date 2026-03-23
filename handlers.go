@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/graph"
 	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/yalex"
 )
+
 
 type apiHandler struct {
 	workspace string
@@ -284,83 +286,41 @@ func (h *apiHandler) runLexer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Resolve and read the input file.
 	inputFull, err := h.resolve(body.InputPath)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	inputBytes, err := os.ReadFile(inputFull)
-	if err != nil {
-		writeError(w, http.StatusNotFound, fmt.Sprintf("input file not found: %s", body.InputPath))
-		return
-	}
 
-	// Infer the lexer spec from the input file's extension.
-	// e.g. "input/test.arithmetic" → extension "arithmetic" → "lexers/arithmetic.yal"
+	// Infer spec name from the input file extension.
+	// e.g. "input/test.arithmetic" → "arithmetic" → "lexers/arithmetic.go"
 	base := filepath.Base(body.InputPath)
 	ext := strings.TrimPrefix(filepath.Ext(base), ".")
 	if ext == "" {
 		writeError(w, http.StatusBadRequest, "cannot infer lexer: file has no extension")
 		return
 	}
-	yalRel := "specs/" + ext + ".yal"
-	yalFull, err := h.resolve(yalRel)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	yalBytes, err := os.ReadFile(yalFull)
-	if err != nil {
-		writeError(w, http.StatusNotFound, fmt.Sprintf("no lexer spec found for extension .%s (expected %s)", ext, yalRel))
+
+	lexerFile := filepath.Join(h.workspace, "lexers", ext+".go")
+	if _, err := os.Stat(lexerFile); err != nil {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("no generated lexer for .%s — run DFA generation first", ext))
 		return
 	}
 
-	yal, err := yalex.ParseYalContent(string(yalBytes))
+	out, err := exec.Command("go", "run", lexerFile, inputFull).Output()
 	if err != nil {
-		writeError(w, http.StatusUnprocessableEntity, err.Error())
-		return
-	}
-	compiled, err := yal.Compile()
-	if err != nil {
-		writeError(w, http.StatusUnprocessableEntity, err.Error())
-		return
-	}
-
-	// Greedy longest-match scan using the single merged DFA.
-	var lines []string
-	runes := []rune(string(inputBytes))
-	pos := 0
-	for pos < len(runes) {
-		state := compiled.DFA.StartState
-		lastAcceptPos := -1
-		lastAction := ""
-		for end := pos; end < len(runes); end++ {
-			next, ok := state.Transitions[runes[end]]
-			if !ok {
-				break
-			}
-			state = next
-			if state.Accept && state.TokenID > 0 {
-				lastAcceptPos = end + 1
-				lastAction = compiled.Actions[state.TokenID-1]
-			}
-		}
-		if lastAcceptPos == -1 {
-			lines = append(lines, fmt.Sprintf("ERROR  unrecognized %q at position %d", string(runes[pos]), pos))
-			pos++
+		if ee, ok := err.(*exec.ExitError); ok {
+			writeError(w, http.StatusUnprocessableEntity, string(ee.Stderr))
 		} else {
-			lexeme := string(runes[pos:lastAcceptPos])
-			lines = append(lines, fmt.Sprintf("MATCH  %-20q  action=%s", lexeme, lastAction))
-			pos = lastAcceptPos
+			writeError(w, http.StatusInternalServerError, err.Error())
 		}
+		return
 	}
 
-	// Save output to workspace/output/<basename>.out
+	lines := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
+
 	os.MkdirAll(filepath.Join(h.workspace, "output"), 0o755)
-	outName := base + ".out"
-	outFull := filepath.Join(h.workspace, "output", outName)
-	os.WriteFile(outFull, []byte(strings.Join(lines, "\n")+"\n"), 0o644)
+	os.WriteFile(filepath.Join(h.workspace, "output", base+".out"), out, 0o644)
 
 	writeJSON(w, map[string]any{"lines": lines})
 }

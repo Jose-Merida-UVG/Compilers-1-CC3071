@@ -1,0 +1,23 @@
+(* simple.yal small spec *)
+(* Tests: let expansion, char classes, +, *, |, float-beats-int munch, ws skip *)
+{
+    const (
+        IDENT = 1
+        INT   = 2
+        FLOAT = 3
+    )
+}
+
+let digit = ['0'-'9']
+let alpha = ['a'-'z'] | ['A'-'Z'] | '_'
+let alnum = alpha | digit
+let int   = digit+
+let float = digit+ '.' digit+
+let ident = alpha alnum*
+let ws    = [' ' '\t' '\n' '\r']
+
+rule tokens =
+  ws+   {  }
+| float { return FLOAT }
+| int   { return INT }
+| ident { return IDENT }

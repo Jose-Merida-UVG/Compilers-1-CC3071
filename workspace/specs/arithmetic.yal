@@ -1,35 +1,31 @@
 (* Arithmetic expression lexer *)
 {
-  (* Header: Go code injected at the top of generated output *)
-  {
     const (
-        WS     = 1
-        EOL    = 2
-        INT    = 3
-        PLUS   = 4
-        MINUS  = 5
-        TIMES  = 6
-        DIV    = 7
+        FLOAT  = 1
+        INT    = 2
+        PLUS   = 3
+        MINUS  = 4
+        TIMES  = 5
+        DIV    = 6
+        MOD    = 7
         LPAREN = 8
         RPAREN = 9
     )
-    }
 }
 
-let digit   = ['0'-'9']
-let int     = digit+
-let float   = digit+ '.' digit+
-let ws      = [' ' '\t' '\n' '\r']
+let digit = ['0'-'9']
+let int   = digit+
+let float = digit+ '.' digit+
+let ws    = [' ' '\t' '\n' '\r']
 
 rule gettoken =
-  ws+                     { (* skip whitespace *) }
-| float                   { return FLOAT }
-| int                     { return INT }
-| '+'                     { return PLUS }
-| '-'                     { return MINUS }
-| '*'                     { return TIMES }
-| '/'                     { return DIV }
-| '%'                     { return MOD }
-| '('                     { return LPAREN }
-| ')'                     { return RPAREN }
-| eof                     { raise EOF }
+  ws+   {  }
+| float { fmt.Println("XD"); return FLOAT}
+| int   { return INT }
+| '+'   { return PLUS }
+| '-'   { return MINUS }
+| '*'   { return TIMES }
+| '/'   { return DIV }
+| '%'   { return MOD }
+| '('   { return LPAREN }
+| ')'   { return RPAREN }

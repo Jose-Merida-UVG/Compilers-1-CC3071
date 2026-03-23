@@ -1,96 +1,8 @@
-# YALex — Lexical Analyzer Generator
+# YALex
 
-A Go-based lexer generator inspired by OCamllex. You write a `.yal` spec file,
-click **◎ Build** in the UI, and get a minimized DFA visualization plus a
-self-contained Go lexer that scans input using maximal munch.
-
----
-
-## Software Architecture
-
-### Overview
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Browser (React + Vite)                   │
-│                                                              │
-│  FileTree  ──→  EditorPane  ──→  DFAViewer / MarkdownViewer │
-│                      │                                       │
-│              toolbar: ◎ Build, ▶ Run                         │
-└──────────────────────┬───────────────────────────────────────┘
-                       │ HTTP /api/*
-┌──────────────────────▼───────────────────────────────────────┐
-│                   Go HTTP Server (main.go)                    │
-│                                                              │
-│  apiHandler                                                  │
-│    getDFA   ──→ yalex.Compile ──→ codegen.GenerateLexer      │
-│    runLexer ──→ go run workspace/lexers/<name>.go <input>    │
-│    file CRUD, workspace tree                                 │
-└──────────────────────────────────────────────────────────────┘
-```
-
-### Pipeline: `.yal` → tokens
-
-```
-.yal file
-   │
-   ▼ internal/yalex
-   Parse header / let defs / rule blocks / trailer
-   Expand let references (transitive substitution)
-   │
-   ▼ internal/regex
-   Normalize pattern strings → postfix (shunting-yard)
-   Build NFA via Thompson construction
-   │
-   ▼ internal/automata
-   Direct DFA construction (subset construction)
-   Merge per-rule DFAs with first-rule-wins priority
-   Hopcroft minimization
-   │
-   ├──▶ internal/graph   → JSON for DFA viewer (Graphviz WASM)
-   │
-   └──▶ internal/codegen → workspace/lexers/<name>.go
-                           (package main, Scan() int, func main())
-```
-
-### Go Packages
-
-| Package | Responsibility |
-|---|---|
-| `internal/yalex` | Parse `.yal` files; expand `let` definitions; orchestrate compilation |
-| `internal/regex` | Pattern normalization, shunting-yard to postfix, AST node types |
-| `internal/automata` | NFA→DFA (direct method), multi-DFA merge, Hopcroft minimization |
-| `internal/codegen` | Emit complete `package main` Go source from minimized DFA + actions |
-| `internal/graph` | Serialize DFA to Graphviz/JSON for the frontend visualizer |
-| `internal/ds` | Generic stack and tree-node used by the regex/automata phases |
-
-### Frontend Components
-
-| Component | Role |
-|---|---|
-| `App.tsx` | State root — open tabs, active file, file-save debounce (200 ms) |
-| `FileTree` | Workspace directory browser; create/rename/delete files & folders |
-| `EditorPane` | Tab bar + Monaco editor; routes `.md` files to MarkdownViewer, DFA tabs to DFAViewer |
-| `DFAViewer` | Interactive Graphviz WASM renderer with pan/zoom and hover labels |
-| `MarkdownViewer` | Renders `.md` files as styled HTML via `react-markdown` + `remark-gfm` |
-| `Terminal` | Displays output lines from the **▶ Run** action |
-
-### HTTP API
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/workspace/tree` | Directory listing |
-| `GET` | `/api/file?path=...` | Read file contents |
-| `POST` | `/api/file` `{path, content}` | Write file |
-| `PUT` | `/api/file` `{path}` | Create empty file |
-| `DELETE` | `/api/file?path=...` | Delete file or directory |
-| `POST` | `/api/file/rename` `{oldPath, newPath}` | Rename / move |
-| `PUT` | `/api/directory` `{path}` | Create directory |
-| `POST` | `/api/dfa` `{path}` | Build DFA from `.yal` → returns graph JSON + writes lexer |
-| `POST` | `/api/lexer` `{inputPath}` | Run generated lexer on input → returns token lines |
-
-`POST /api/lexer` infers the spec from the input file extension:
-`input/test.arithmetic` → `specs/arithmetic.yal` → `lexers/arithmetic.go`.
+A lexical analyzer generator written in Go. You write a `.yal` spec describing
+your token patterns, click **◎ Build**, and get a minimized DFA you can explore
+visually plus a standalone Go lexer file you can run against any input.
 
 ---
 
@@ -98,33 +10,179 @@ self-contained Go lexer that scans input using maximal munch.
 
 ```
 .
-├── main.go               entry point — HTTP server + handler wiring
-├── handlers.go           getDFA, runLexer, file CRUD handlers
-├── Makefile
-├── workspace/
-│   ├── specs/            .yal spec files (source)
-│   ├── lexers/           generated .go lexers + .dfa.json (output of Build)
-│   ├── input/            test input files
-│   └── YALEX.md          YALex spec reference (opens in MarkdownViewer)
+├── main.go               HTTP server entry point
+├── handlers.go           API handlers (build DFA, run lexer, file CRUD)
 ├── internal/
-│   ├── yalex/            parser + compiler orchestration
-│   ├── regex/            pattern → postfix → AST
-│   ├── automata/         DFA construction + minimization
-│   ├── codegen/          DFA + actions → Go source
-│   ├── graph/            DFA → JSON for viewer
-│   └── ds/               generic stack / tree node
-└── frontend/
-    ├── src/
-    │   ├── App.tsx
-    │   ├── components/
-    │   │   ├── Editor/
-    │   │   ├── FileTree/
-    │   │   ├── DFAViewer/
-    │   │   ├── MarkdownViewer/
-    │   │   └── Terminal/
-    │   └── lib/
-    │       └── monaco-yal.ts   YALex syntax highlighting for Monaco
-    └── vite.config.ts
+│   ├── yalex/            .yal parser + let-def expansion + compilation
+│   ├── regex/            pattern normalization → postfix → token list
+│   ├── automata/         direct DFA construction, merge, Hopcroft minimization
+│   ├── codegen/          DFA + actions → self-contained Go source file
+│   ├── graph/            DFA → JSON for the frontend visualizer
+│   └── ds/               generic stack and tree node
+├── frontend/             React + Vite
+│   └── src/components/
+│       ├── Editor/       Monaco editor with YALex syntax highlighting
+│       ├── FileTree/     workspace file browser
+│       ├── DFAViewer/    Graphviz WASM renderer (pan/zoom, hover labels)
+│       ├── MarkdownViewer/  renders .md files in-editor
+│       └── Terminal/     output panel for ▶ Run
+└── workspace/
+    ├── specs/            your .yal files go here
+    ├── lexers/           generated .go files land here after Build
+    └── input/            test input files
+```
+
+---
+
+## How It Works
+
+### 1. Parsing the spec
+
+`internal/yalex` reads a `.yal` file in four sections:
+
+```
+{ header }          optional verbatim Go — constants, imports
+let ident = regex   named pattern definitions (transitively expanded)
+rule name =         one or more pattern → action arms
+  pattern { action }
+{ trailer }         optional verbatim Go — helper functions
+```
+
+Let definitions are expanded transitively before any DFA is built. If you write:
+
+```
+let digit = ['0'-'9']
+let int   = digit+
+```
+
+then every occurrence of `int` in rule patterns is substituted with `((['0'-'9'])+)`
+before the regex engine sees it.
+
+### 2. Regex → postfix → DFA (per pattern)
+
+Each expanded pattern goes through `internal/regex`:
+
+- **Normalize** — converts the YALex pattern syntax (`['a'-'z']`, char literals,
+  `+`, `?`, `|`, grouping) into a flat token list (`RegexString`).
+- **Explicit concatenation** — inserts `~` operators between adjacent tokens so
+  the grammar is fully explicit.
+- **Shunting-yard** — converts infix token list to postfix.
+- **End-marker append** — appends a unique sentinel rune (`\uE000`) so the DFA
+  knows where each pattern ends.
+
+The postfix `RegexString` is then handed to `internal/automata`:
+
+- **Direct method** — builds the DFA directly from the syntax tree without going
+  through an NFA. Computes `nullable`, `firstpos`, `lastpos`, and `followpos` on
+  the AST, then runs subset construction on position sets.
+- **Hopcroft minimization** — reduces the DFA to its minimal equivalent.
+
+### 3. Merging all patterns
+
+`automata.Merge` takes one minimized DFA per pattern and builds a single combined
+DFA using **parallel simulation**: each state in the merged DFA is a tuple of
+per-pattern state IDs. When a tuple is accepting, the lowest-indexed pattern wins
+(**first-rule-wins**). The merged DFA is minimized again.
+
+### 4. Code generation
+
+`internal/codegen.GenerateLexer` emits a complete `package main` Go file:
+
+- The user's header block verbatim (your token constants go here).
+- Static transition table (`map[int]map[rune]int`) and accept table
+  (`map[int]int`) derived from the minimized DFA.
+- A `Lexer` struct with `Lxm string`, `Ln int`, `Col int` fields.
+- `New<Name>Lexer(input string) *Lexer` constructor.
+- `Scan() int` — advances to the next token, returns its ID. Actions are
+  embedded verbatim; a `return` in an action exits `Scan()`, no `return`
+  keeps scanning (how you skip whitespace).
+- `func main()` so the file can be run with `go run`.
+
+### 5. Running the lexer
+
+When you click **▶ Run**, the backend does:
+
+```
+go run workspace/lexers/<name>.go workspace/input/<your-file>
+```
+
+Output lines come back to the terminal panel in the UI.
+
+---
+
+## Pipeline at a glance
+
+```
+arithmetic.yal
+│
+│  let digit = ['0'-'9']
+│  let float = digit+ '.' digit+
+│  rule gettoken =
+│    float  { return FLOAT }
+│  | '+'    { return PLUS }
+│
+▼ yalex.Parse + expandDefinitions
+│
+│  pattern 1: ((['0'-'9'])+)'.'((['0'-'9'])+)
+│  pattern 2: '+'
+│
+▼ regex.Preprocess (normalize → explicit concat → shunting-yard → postfix)
+▼ automata.Compile (direct method → minimize)   — one DFA per pattern
+▼ automata.Merge (parallel simulation → minimize) — one combined DFA
+▼ codegen.GenerateLexer
+│
+└─▶ workspace/lexers/arithmetic.go   (package main, Scan() int)
+└─▶ DFA graph JSON                   (rendered in browser)
+```
+
+---
+
+## Example
+
+`workspace/specs/arithmetic.yal`:
+
+```
+{
+    const (
+        FLOAT  = 1
+        INT    = 2
+        PLUS   = 3
+        MINUS  = 4
+        TIMES  = 5
+        DIV    = 6
+        MOD    = 7
+        LPAREN = 8
+        RPAREN = 9
+    )
+}
+
+let digit = ['0'-'9']
+let int   = digit+
+let float = digit+ '.' digit+
+let ws    = [' ' '\t' '\n' '\r']
+
+rule gettoken =
+  ws+    {  }
+| float  { return FLOAT }
+| int    { return INT }
+| '+'    { return PLUS }
+| '-'    { return MINUS }
+| '*'    { return TIMES }
+| '/'    { return DIV }
+| '%'    { return MOD }
+| '('    { return LPAREN }
+| ')'    { return RPAREN }
+```
+
+Running `workspace/input/test_a.arithmetic` through the generated lexer:
+
+```
+FLOAT  "3.14"   ln=1 col=1
+PLUS   "+"      ln=1 col=5
+INT    "2"      ln=1 col=6
+TIMES  "*"      ln=1 col=8
+LPAREN "("      ln=1 col=9
+...
 ```
 
 ---
@@ -132,49 +190,8 @@ self-contained Go lexer that scans input using maximal munch.
 ## Running Locally
 
 ```bash
-make frontend-install   # first time only
-make dev                # Go API :8080 + Vite hot-reload :5173
+make frontend-install   # once
+make dev                # Go API :8080 + Vite :5173
 ```
 
-Open `http://localhost:5173`. Production build: `make build && ./yalex`.
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Backend | Go 1.22, stdlib `net/http` |
-| Frontend | React 18, TypeScript, Vite |
-| Editor | Monaco Editor (`@monaco-editor/react`) |
-| DFA visualization | Graphviz WASM (`@hpcc-js/wasm-graphviz`), React Flow |
-| Markdown rendering | `react-markdown` + `remark-gfm` |
-| Generated lexers | Pure Go — no runtime dependencies |
-
----
-
-## How the Generated Lexer Works
-
-The generated `workspace/lexers/<name>.go` is a complete `package main` program.
-
-```go
-type Lexer struct {
-    Lxm string   // matched lexeme
-    Ln  int       // 1-based line
-    Col int       // 1-based column
-    // internal fields
-}
-
-func New<Name>Lexer(input string) *Lexer
-func (l *Lexer) Scan() int   // returns token ID; 0 = EOF, -1 = ERROR
-```
-
-**Scanning rules:**
-
-1. **Maximal munch** — always matches the longest possible string.
-2. **First-rule-wins** — when two patterns match the same length, the earlier rule in the `.yal` file wins.
-3. **Error recovery** — consecutive unrecognised characters are grouped into a single `ERROR` token; scanning never stops.
-
-Actions in the `.yal` file are verbatim Go. An action that contains `return` exits `Scan()` and delivers the token; an action without `return` loops and picks up the next token (standard way to skip whitespace).
-
-For the full `.yal` syntax reference, open `workspace/YALEX.md` in the editor.
+Open `http://localhost:5173`. Production: `make build && ./yalex`.

@@ -56,24 +56,27 @@
 
 .md-viewer table {
   border-collapse: collapse;
-  width: 100%;
-  margin: 1em 0;
+  margin: 1.2em 0;
+  font-size: 0.9em;
 }
 
 .md-viewer th,
 .md-viewer td {
-  border: 1px solid #333;
-  padding: 8px 12px;
+  border: 1px solid #3a3a3a;
+  padding: 7px 14px;
   text-align: left;
+  white-space: nowrap;
 }
 
 .md-viewer th {
-  background: #252526;
-  color: #e2e2e2;
+  background: #2a2d2e;
+  color: #cdd6f4;
   font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
-.md-viewer tr:nth-child(even) { background: #1e1e1e; }
+.md-viewer tr:nth-child(even) td { background: #232527; }
+.md-viewer tr:hover td { background: #2a2d2e; }
 
 .md-viewer ul,
 .md-viewer ol {

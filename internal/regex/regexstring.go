@@ -11,14 +11,13 @@ const (
 	RuneEOF       rune = '\uE002' // end-of-buffer sentinel from the `eof` keyword
 )
 
-// TokenKind classifies the semantic role of a Token after preprocessing.
-// This replaces the old "escaped bool" approach: the kind carries all the
-// operator/operand information so downstream passes never need to inspect
+// TokenKind classifies the semantic role of a Token after preprocessing. The kind
+// carries all the operator/operand information so downstream passes never need to inspect
 // the raw rune to decide how to treat a token.
 type TokenKind int
 
 const (
-	Lit    TokenKind = iota // literal operand: char, end-marker (#)
+	Lit    TokenKind = iota // literal operand: char, end-marker (# / RuneEndMarker \uE000)
 	Eps                     // ε empty string (inserted during desugaring, never from user input)
 	Star                    // * Kleene closure
 	Plus                    // + one-or-more (desugared to xx* by HandleSpecialOperators)
@@ -39,7 +38,7 @@ type Token struct {
 }
 
 // IsOperator reports whether this token acts as an operator in the regex grammar.
-// Lit and Eps are both operands (leaves in the AST); everything else is an operator.
+// Lit and Eps are both operands (leaves in the AST), everything else is an operator.
 func (t Token) IsOperator() bool { return t.Kind != Lit && t.Kind != Eps }
 
 // epsToken is a convenience constructor for the epsilon (empty string) token.
@@ -62,7 +61,7 @@ func (rs *RegexString) String() string {
 	return sb.String()
 }
 
-// AppendEndMarker appends the `#` end-marker literal and a Cat operator,
+// AppendEndMarker appends the end-marker literal (# / RuneEndMarker \uE000) and a Cat operator,
 // forming `<regex> ~ #` which anchors the rightmost leaf for direct DFA.
 func (rs *RegexString) AppendEndMarker() {
 	rs.Chars = append(rs.Chars, litToken(RuneEndMarker))

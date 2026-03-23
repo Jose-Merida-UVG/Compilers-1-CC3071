@@ -285,11 +285,9 @@ func (p *patParser) readCharClass() ([]Token, error) {
 }
 
 // readCharSetContent parses the interior of [...] and returns the collected rune set.
-// Handles:
-//   - 'c'         — single char literal (with escape resolution)
-//   - 'c1'-'c2'  — inclusive range
-//   - "abc"       — string (each char added individually)
+// Handles 'c', 'c1' - 'c2' & "abc"
 func (p *patParser) readCharSetContent() ([]rune, error) {
+	// Set for the symbols
 	seen := map[rune]bool{}
 	var set []rune
 	add := func(r rune) {
@@ -298,13 +296,15 @@ func (p *patParser) readCharSetContent() ([]rune, error) {
 			set = append(set, r)
 		}
 	}
-
+	// Go through input
 	for {
+		// Exit on eof or ]
 		p.skipWS()
 		if p.eof() || p.peek() == ']' {
 			break
 		}
 		switch p.peek() {
+		// Match ' -> read literal
 		case '\'':
 			r1, err := p.readCharLit()
 			if err != nil {
@@ -328,7 +328,7 @@ func (p *patParser) readCharSetContent() ([]rune, error) {
 						add(r)
 					}
 				} else {
-					// '-' was not part of a range — backtrack and add r1 and '-' literally
+					// '-' was not part of a range, backtrack and add r1 and '-' literally
 					p.pos = saved
 					add(r1)
 				}
@@ -337,7 +337,8 @@ func (p *patParser) readCharSetContent() ([]rune, error) {
 			}
 
 		case '"':
-			p.next() // consume opening "
+			// Consume opening "
+			p.next()
 			for {
 				if p.eof() {
 					return nil, fmt.Errorf("unclosed string inside char class")
@@ -346,6 +347,7 @@ func (p *patParser) readCharSetContent() ([]rune, error) {
 					p.next()
 					break
 				}
+				// If not end of string read char body
 				r, err := p.readCharBody()
 				if err != nil {
 					return nil, err
@@ -360,13 +362,15 @@ func (p *patParser) readCharSetContent() ([]rune, error) {
 	return set, nil
 }
 
+// Helper function to identify a-z and A-Z
 func isIdentStart(ch rune) bool {
 	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
 }
 
+// Reads identifier
 func (p *patParser) readIdent() string {
 	start := p.pos
-	for !p.eof() && (isIdentStart(p.peek()) || (p.peek() >= '0' && p.peek() <= '9') || p.peek() == '_') {
+	for !p.eof() && (isIdentStart(p.peek()) || (p.peek() >= '0' && p.peek() <= '9')) {
 		p.pos++
 	}
 	return string(p.runes[start:p.pos])
@@ -393,8 +397,8 @@ func runeSetDiff(a []rune, exclude map[rune]bool) []rune {
 	return out
 }
 
-// runeSetToTokens expands a rune set to LP Lit(r0) Alt Lit(r1) … RP,
-// sorted by rune value for deterministic output.
+// runeSetToTokens expands a rune set to LP (r0 | r1 | r2 | ...)
+// sorted by rune value
 func runeSetToTokens(rs []rune) []Token {
 	sorted := make([]rune, len(rs))
 	copy(sorted, rs)

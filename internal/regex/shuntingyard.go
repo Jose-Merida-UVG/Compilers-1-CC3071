@@ -7,6 +7,7 @@ import (
 )
 
 // findOpenPar scans leftward from closeIndex to find the matching `(`.
+// Just a utility func :)
 func findOpenPar(regex []Token, closeIndex int) int {
 	parenCount := 1
 	for i := closeIndex - 1; i >= 0; i-- {
@@ -23,7 +24,7 @@ func findOpenPar(regex []Token, closeIndex int) int {
 	return -1
 }
 
-// HandleSpecialOperators desugars `?` and `+` into their primitive equivalents.
+// HandleSpecialOperators substitutes '?' and '+' with their primitive equivalents.
 //   - x? → (x|ε)
 //   - x+ → xx*
 func (regex *RegexString) HandleSpecialOperators() {
@@ -109,7 +110,7 @@ func precedence(t Token) int {
 	}
 }
 
-// ShuntingYard converts the infix token sequence to postfix (RPN).
+// ShuntingYard converts the infix token sequence to postfix.
 func (regex *RegexString) ShuntingYard() {
 	result := []Token{}
 	stack := ds.Stack[Token]{}

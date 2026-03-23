@@ -1,5 +1,15 @@
 package regex
 
+// This package manages the flow of getting a pattern (regex) and
+// turning it into an AST. This AST is then consumed downstream for
+// the automata generation via Direct Method. The process is a bit
+// convoluted, since this project was built top of a different implementation
+// for different specs. However, general file structure is the following:
+// - regexstring.go: The struct definition of regex, a list of tokens.
+// - normalize.go: Construction of a regexstring from a valid string pattern
+// - shuntingyard.go: ShuntingYard + other preprocessing to go from infix -> postfix -> AST
+// This file specifically just handles the whole process
+
 // Regex represents a single YALex pattern string to be compiled.
 type Regex struct {
 	Pattern string
@@ -10,15 +20,7 @@ func NewRegex(pattern string) *Regex {
 }
 
 // Preprocess normalizes and transforms the YALex pattern into a postfix token
-// sequence ready for AST/DFA construction. The pipeline is:
-//
-//  1. NormalizePattern  — resolve all YALex syntax (quoted chars, string
-//     literals, char classes, negation, set-difference, wildcard, eof) into
-//     a flat stream of canonical tokens.
-//  2. HandleSpecialOperators — desugar + and ? into * and |.
-//  3. HandleExplicitConcatenation — insert Cat (~) tokens.
-//  4. ShuntingYard — convert infix to postfix (RPN).
-//  5. AppendEndMarker — append the # end-marker leaf.
+// sequence ready for AST/DFA construction.
 func (r *Regex) Preprocess() (*RegexString, error) {
 	rs, err := NormalizePattern(r.Pattern)
 	if err != nil {

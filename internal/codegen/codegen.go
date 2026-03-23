@@ -2,7 +2,7 @@ package codegen
 
 import (
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/automata"
@@ -11,16 +11,12 @@ import (
 
 // GenerateLexer returns the full source text of a Go file (package lexers)
 // that implements a Lex-style streaming scanner driven by the given minimized DFA.
-//
-//   name    — base identifier; the constructor will be called New<Name>Lexer.
-//   yf      — already-parsed YalFile, used to extract header / trailer sections.
-//   dfa     — minimized, merged DFA from automata.Merge + Minimize.
-//   actions — parallel action strings; actions[i] maps to TokenID i+1.
-//             Actions are embedded verbatim as Go code. Actions that return
-//             exit Yylex (token emitted); actions that don't return let the
-//             scan loop continue (skip/whitespace).
+// Actions are embedded verbatim as Go code. Actions that return
+// exit Yylex (token emitted); actions that don't return let the
+// scan loop continue (skip/whitespace).
 func GenerateLexer(name string, yf *yalex.YalFile, dfa *automata.DFA, actions []string) string {
 	exportedName := capitalize(name)
+	scanName := yf.Rules[0].Entrypoint
 
 	header := yf.Header
 	trailer := yf.Trailer
@@ -42,7 +38,8 @@ func GenerateLexer(name string, yf *yalex.YalFile, dfa *automata.DFA, actions []
 
 	// TOKEN_N constants mirror the 1-based TokenID values stored in the DFA's
 	// accept table. They are emitted for reference — the user's named constants
-	// from the header (FLOAT, INT, etc.) are what actions actually return.
+	// from the header (FLOAT, INT, etc.) are what actions actually return. This is
+	// used to match dfa accept state -> corresponding action
 	w("// Token ID constants — one per pattern, in the order they appear in the spec.\n")
 	w("const (\n")
 	for i, action := range actions {
@@ -59,6 +56,7 @@ func GenerateLexer(name string, yf *yalex.YalFile, dfa *automata.DFA, actions []
 		w("// --- header ---\n%s\n\n", header)
 	}
 
+	// Define state between calls to scan func
 	w(`// Lexer holds the scanning state between calls to Scan.
 type Lexer struct {
 	input []rune
@@ -100,17 +98,15 @@ type Lexer struct {
 	}
 	w("}\n\n")
 
-	// NOTE: all format verbs inside this raw string are for the *generated* file's
-	// fmt.Printf calls, not for this w() call. %% in the template becomes a literal
-	// % in the output; %d / %s here are consumed by w() to splice in startID / name.
-	w(`// Scan advances to the next token and returns its ID.
-// Lxm, Ln, and Col are set before the action runs.
+	w("// %s advances to the next token and returns its ID.\n", scanName)
+	w(`// Lxm, Ln, and Col are set before the action runs.
 // Actions that return emit the token to the caller.
 // Actions that don't return let the scan loop continue (skip).
 // Consecutive unrecognised characters are grouped into one ERROR token.
 // Returns EOF (0) at end of input, ERROR (-1) for unrecognised characters.
-func (l *Lexer) Scan() int {
-	for l.pos < len(l.input) {
+`)
+	w("func (l *Lexer) %s() int {\n", scanName)
+	w(`	for l.pos < len(l.input) {
 		// Snapshot the position at the start of each token attempt.
 		// If the inner loop overshoots, we backtrack here via lastPos/lastLine/lastCol.
 		startPos  := l.pos
@@ -230,7 +226,7 @@ func (l *Lexer) Scan() int {
 	}
 	l := New%sLexer(string(data))
 	for {
-		tok := l.Scan()
+		tok := l.%s()
 		if tok == EOF {
 			break
 		}
@@ -241,7 +237,7 @@ func (l *Lexer) Scan() int {
 		fmt.Printf("%%d  %%-20q  ln=%%d col=%%d\n", tok, l.Lxm, l.Ln, l.Col)
 	}
 }
-`, name, exportedName)
+`, name, exportedName, scanName)
 
 	return b.String()
 }
@@ -254,7 +250,6 @@ func capitalize(s string) string {
 	return strings.ToUpper(s[:1]) + s[1:]
 }
 
-
 // sortedRunes returns the rune keys of a DFAState transition map in ascending
 // order for deterministic output.
 func sortedRunes(m map[rune]*automata.DFAState) []rune {
@@ -262,7 +257,7 @@ func sortedRunes(m map[rune]*automata.DFAState) []rune {
 	for r := range m {
 		runes = append(runes, r)
 	}
-	sort.Slice(runes, func(i, j int) bool { return runes[i] < runes[j] })
+	slices.Sort(runes)
 	return runes
 }
 

@@ -4,7 +4,7 @@
 // The pipeline for a single pattern is:
 //   - compile.go: orchestrates the full flow — regex → AST → table → DFA → minimize
 //   - direct.go:  builds the DFA directly from the syntax tree (direct method),
-//                 computing nullable/firstpos/lastpos/followpos on the AST nodes
+//     computing nullable/firstpos/lastpos/followpos on the AST nodes
 //   - minimization.go: Hopcroft partition-refinement minimization + state rebuild
 //   - dfa.go:     DFA/DFAState structs, transitions, alphabet, simulation helpers
 //
@@ -14,7 +14,7 @@
 package automata
 
 import (
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -29,17 +29,13 @@ func Compile(rs *regex.RegexString) *DFA {
 }
 
 // Merge combines multiple per-pattern DFAs into one minimized DFA using
-// parallel simulation (also called the product construction).
-//
-// The core idea: instead of running each DFA independently and picking the
-// winner afterward, we simulate ALL of them simultaneously. Each state in the
-// merged DFA is a multiState — a tuple of state IDs, one per input DFA.
+// parallel simulation / product construction. All the DFA's are
+// simulated simultaneously & each state in the merged DFA is a multiState
+// represented by a tuple of state IDs, one per input DFA.
 // Component i holds the current state of DFA i, or -1 if that DFA has died
-// (no valid transition for the symbol seen so far).
-//
-// At any accepting multiState, the component with the lowest index (i.e. the
-// pattern listed earliest in the .yal file) wins — this is first-rule-wins.
-// The merged DFA is minimized afterward to collapse any equivalent states.
+// (no valid transition for the symbol seen so far). At any accepting multiState,
+// the component with the lowest index (i.e. the pattern listed earliest in the .yal
+// file) wins. The merged DFA is minimized afterward to collapse any equivalent states.
 func Merge(dfas []*DFA) *DFA {
 	if len(dfas) == 0 {
 		return nil
@@ -69,7 +65,7 @@ func Merge(dfas []*DFA) *DFA {
 	for r := range alphaSet {
 		alphabet = append(alphabet, r)
 	}
-	sort.Slice(alphabet, func(i, j int) bool { return alphabet[i] < alphabet[j] })
+	slices.Sort(alphabet)
 
 	// A multiState is a slice of n state IDs, one per input DFA.
 	// -1 means that DFA has no transition for the current path (dead).
@@ -89,8 +85,7 @@ func Merge(dfas []*DFA) *DFA {
 	// tokenOf scans the multiState left-to-right and returns the 1-based token
 	// ID of the first accepting component. Left-to-right order is pattern order,
 	// so the earliest pattern in the .yal file wins when multiple DFAs accept
-	// the same string — first-rule-wins priority.
-	// Returns 0 if no component is currently in an accepting state.
+	// the same string .Returns 0 if no component is currently in an accepting state.
 	tokenOf := func(ms multiState) int {
 		for i, id := range ms {
 			if id == -1 {
@@ -103,7 +98,7 @@ func Merge(dfas []*DFA) *DFA {
 		return 0
 	}
 
-	// Seed the BFS: the start multiState has every DFA at its own start state.
+	// The start multiState has every DFA at its own start state.
 	startMS := make(multiState, n)
 	for i, dfa := range dfas {
 		startMS[i] = dfa.StartState.ID
@@ -145,11 +140,11 @@ func Merge(dfas []*DFA) *DFA {
 					next[i] = ns.ID
 					anyAlive = true
 				} else {
-					// This DFA dies on sym — mark it dead for the rest of this path
+					// This DFA dies on sym, mark it dead for the rest of this path
 					next[i] = -1
 				}
 			}
-			// If every component is dead, this symbol leads nowhere — skip it.
+			// If every component is dead, this symbol leads nowhere
 			if !anyAlive {
 				continue
 			}

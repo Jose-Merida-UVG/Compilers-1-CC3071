@@ -2,7 +2,7 @@ package automata
 
 import (
 	"fmt"
-	"sort"
+	"slices"
 
 	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/ds"
 	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/regex"
@@ -155,12 +155,16 @@ func copySlice(a []int) []int {
 // Each DFA state corresponds to a set of leaf positions; a state is accepting
 // when its position set contains the end-marker position (AcceptID).
 func (table *DirectTable) ToDFA() *DFA {
+	// stateMap: position-set key -> DFA state.
+	// Each DFA state represents a unique set of leaf positions (e.g., "{1,3,5}").
 	stateMap := make(map[string]*DFAState)
 
+	// setKey: canonical string key for a position set.
+	// Sorts before encoding so {3,1} and {1,3} map to the same key.
 	setKey := func(set []int) string {
 		cpy := make([]int, len(set))
 		copy(cpy, set)
-		sort.Ints(cpy)
+		slices.Sort(cpy)
 		key := ""
 		for _, v := range cpy {
 			key += fmt.Sprintf("%d,", v)
@@ -168,28 +172,21 @@ func (table *DirectTable) ToDFA() *DFA {
 		return key
 	}
 
-	contains := func(slice []int, value int) bool {
-		for _, v := range slice {
-			if v == value {
-				return true
-			}
-		}
-		return false
-	}
-
-	// Seed the BFS with the start state (firstpos of the root)
+	// Seed the BFS with the start state (firstpos of the root).
+	// startSet is the initial position set; we map it to the DFA's start state.
 	queue := [][]int{}
 	startSet := table.StartState
 	startKey := setKey(startSet)
 	startState := NewDFAState()
-	// A position set is accepting if it contains the end-marker position
-	if contains(startSet, table.AcceptID) {
+	// A position set is accepting if it contains the end-marker position (AcceptID).
+	if slices.Contains(startSet, table.AcceptID) {
 		startState.SetToken(1)
 	}
 	stateMap[startKey] = startState
 	queue = append(queue, startSet)
 
-	// Build the alphabet once from all non-sentinel positions.
+	// Collect every character that appears in the regex (skip the end-marker sentinel).
+	// Sorted for deterministic transition order.
 	alphabet := make(map[rune]bool)
 	for _, char := range table.PosToChar {
 		if char != regex.RuneEndMarker {
@@ -200,8 +197,9 @@ func (table *DirectTable) ToDFA() *DFA {
 	for r := range alphabet {
 		sortedAlpha = append(sortedAlpha, r)
 	}
-	sort.Slice(sortedAlpha, func(i, j int) bool { return sortedAlpha[i] < sortedAlpha[j] })
+	slices.Sort(sortedAlpha)
 
+	// BFS: each iteration expands one position set into its successor sets.
 	for len(queue) > 0 {
 		currentSet := queue[0]
 		queue = queue[1:]
@@ -209,8 +207,8 @@ func (table *DirectTable) ToDFA() *DFA {
 		currentDFAState := stateMap[currentKey]
 
 		for _, symbol := range sortedAlpha {
-			// Compute move(currentSet, symbol): union of nextpos for every position
-			// in the current set that matches this symbol
+			// move(currentSet, symbol): union of followpos for every position
+			// in the current set whose character matches symbol.
 			newSetMap := make(map[int]bool)
 			for _, pos := range currentSet {
 				if table.PosToChar[pos] == symbol {
@@ -220,17 +218,19 @@ func (table *DirectTable) ToDFA() *DFA {
 				}
 			}
 			if len(newSetMap) == 0 {
+				// No positions match this symbol — no transition.
 				continue
 			}
+			// Flatten the set map into a slice for key computation.
 			var newSet []int
 			for id := range newSetMap {
 				newSet = append(newSet, id)
 			}
 			newKey := setKey(newSet)
-			// Only create a new DFA state if this position set is new
+			// Register the new position set as a DFA state if we haven't seen it yet.
 			if _, exists := stateMap[newKey]; !exists {
 				newState := NewDFAState()
-				if contains(newSet, table.AcceptID) {
+				if slices.Contains(newSet, table.AcceptID) {
 					newState.SetToken(1)
 				}
 				stateMap[newKey] = newState

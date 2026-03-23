@@ -17,13 +17,13 @@ const (
 type TokenKind int
 
 const (
-	Lit    TokenKind = iota // literal operand: char, end-marker (# / RuneEndMarker \uE000)
-	Eps                     // ε empty string (inserted during desugaring, never from user input)
+	Lit    TokenKind = iota // literal operand
+	Eps                     // ε empty string
 	Star                    // * Kleene closure
-	Plus                    // + one-or-more (desugared to xx* by HandleSpecialOperators)
-	Quest                   // ? optional     (desugared to (x|ε) by HandleSpecialOperators)
+	Plus                    // + one-or-more
+	Quest                   // ? optional
 	Alt                     // | alternation
-	Cat                     // ~ explicit concatenation (inserted by preprocessing)
+	Cat                     // ~ explicit concatenation
 	LParen                  // ( grouping open
 	RParen                  // ) grouping close
 )

@@ -1,31 +1,56 @@
-(* Arithmetic expression lexer *)
+(* Arithmetic expression lexer - integers, floats, operators, grouping *)
+
+(* Token value declarations *)
 {
     const (
-        FLOAT  = 1
-        INT    = 2
-        PLUS   = 3
-        MINUS  = 4
-        TIMES  = 5
-        DIV    = 6
-        MOD    = 7
-        LPAREN = 8
-        RPAREN = 9
+        FLOAT  = 1  (* floating point literal  *)
+        INT    = 2  (* integer literal          *)
+        PLUS   = 3  (* +                        *)
+        MINUS  = 4  (* -                        *)
+        TIMES  = 5  (* *                        *)
+        DIV    = 6  (* /                        *)
+        MOD    = 7  (* %                        *)
+        POW    = 8  (* ** operator              *)
+        LPAREN = 9  (* (                        *)
+        RPAREN = 10 (* )                        *)
+        COMMA  = 11 (* ,                        *)
+        KWPOW  = 12 (* pow keyword              *)
+        IDENT  = 13 (* identifier               *)
     )
 }
 
+(* Primitive character classes *)
 let digit = ['0'-'9']
+let lower = ['a'-'z']
+let upper = ['A'-'Z']
+let alpha = lower | upper
+
+(* Composite definitions *)
+let alnum = alpha | digit
 let int   = digit+
 let float = digit+ '.' digit+
-let ws    = [' ' '\t' '\n' '\r']
+let pow   = '*' '*'
 
+(* pow keyword - must be listed before ident to trigger first-rule-wins *)
+(* maximal munch still applies: 'power' will match ident, not kwpow     *)
+let kwpow = 'p' 'o' 'w'
+
+(* Whitespace *)
+let ws = [' ' '\t' '\n' '\r']
+
+(* Rules - order matters: longer/more specific patterns listed first *)
 rule gettoken =
-  ws+   {  }
-| float { fmt.Println("XD"); return FLOAT}
-| int   { return INT }
-| '+'   { return PLUS }
-| '-'   { return MINUS }
-| '*'   { return TIMES }
-| '/'   { return DIV }
-| '%'   { return MOD }
-| '('   { return LPAREN }
-| ')'   { return RPAREN }
+  ws+    {  }
+| float  { fmt.Print("FLOAT   "); return FLOAT }
+| int    { fmt.Print("INT     "); return INT }
+| pow    { fmt.Print("POW     "); return POW }
+| kwpow  { fmt.Print("KWPOW   "); return KWPOW }
+| '+'    { fmt.Print("PLUS    "); return PLUS }
+| '-'    { fmt.Print("MINUS   "); return MINUS }
+| '*'    { fmt.Print("TIMES   "); return TIMES }
+| '/'    { fmt.Print("DIV     "); return DIV }
+| '%'    { fmt.Print("MOD     "); return MOD }
+| '('    { fmt.Print("LPAREN  "); return LPAREN }
+| ')'    { fmt.Print("RPAREN  "); return RPAREN }
+| ','    { fmt.Print("COMMA   "); return COMMA }
+| alpha alnum* { fmt.Print("IDENT   "); return IDENT }

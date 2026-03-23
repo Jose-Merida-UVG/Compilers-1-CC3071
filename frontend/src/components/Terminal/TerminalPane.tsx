@@ -37,8 +37,8 @@ export default function TerminalPane({ lines, onClear, height }: Props) {
 
 function classify(line: string): string {
   if (line.startsWith("Error") || line.startsWith("ERROR")) return "error";
-  if (line.startsWith("MATCH")) return "match";
   if (line.startsWith("Saved") || line.startsWith("──")) return "success";
   if (line.startsWith("▶") || line.startsWith("Building")) return "info";
+  if (line.trim().length > 0) return "match";
   return "";
 }

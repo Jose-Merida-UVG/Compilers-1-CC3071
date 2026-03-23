@@ -1,7 +1,7 @@
 import MonacoEditor from "@monaco-editor/react";
 import type * as Monaco from "monaco-editor";
 import type { EditorTab } from "../../types";
-import { registerYALLanguage } from "../../lib/monaco-yal";
+import { registerYALLanguage, registerOutLanguage } from "../../lib/monaco-yal";
 import DFAViewer from "../DFAViewer/DFAViewer";
 import MarkdownViewer from "../MarkdownViewer/MarkdownViewer";
 import "./Editor.css";
@@ -28,6 +28,7 @@ export default function EditorPane({
 
   const handleBeforeMount = (monaco: typeof Monaco) => {
     registerYALLanguage(monaco);
+    registerOutLanguage(monaco);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -88,7 +89,7 @@ export default function EditorPane({
             <MonacoEditor
               height="100%"
               language={getLanguage(active.path)}
-              theme="yalex-dark"
+              theme={active.path.endsWith(".out") ? "yalex-dark-out" : "yalex-dark"}
               value={active.content}
               beforeMount={handleBeforeMount}
               onChange={(val) => { if (val !== undefined) onChangeContent(active.path, val); }}
@@ -148,6 +149,7 @@ function Hint({ keys, label }: { keys: string[]; label: string }) {
 
 function getLanguage(path: string): string {
   if (path.endsWith(".yal"))  return "yalex";
+  if (path.endsWith(".out"))  return "lexout";
   if (path.endsWith(".go"))   return "go";
   if (path.endsWith(".json")) return "json";
   if (path.endsWith(".ts") || path.endsWith(".tsx")) return "typescript";

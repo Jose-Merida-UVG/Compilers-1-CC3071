@@ -5,6 +5,8 @@ import (
 	"sort"
 )
 
+// DFA is the top-level automaton. Only the start state is stored; all other
+// states are reachable by following Transitions recursively.
 type DFA struct {
 	StartState *DFAState
 }
@@ -13,6 +15,9 @@ func NewDFA(startState *DFAState) *DFA {
 	return &DFA{StartState: startState}
 }
 
+// DFAState is a node in the automaton.
+// TokenID is set on accepting states to record which pattern matched (1-based).
+// Non-accepting states carry TokenID = 0.
 type DFAState struct {
 	ID          int
 	Transitions map[rune]*DFAState
@@ -20,6 +25,8 @@ type DFAState struct {
 	TokenID     int // 1-based index into the pattern list; 0 on non-accept states
 }
 
+// DFAStateCounter is a global monotonic counter used to assign unique IDs.
+// All DFAState instances share this counter regardless of which DFA they belong to.
 var DFAStateCounter int
 
 func NewDFAState() *DFAState {
@@ -52,6 +59,8 @@ func (dfa *DFA) Alphabet() map[rune]bool {
 	return alphabet
 }
 
+// Sim runs the DFA on input and returns whether it ends in an accepting state.
+// Used for testing; the generated lexer drives the DFA tables directly.
 func (dfa *DFA) Sim(input string) bool {
 	currentState := dfa.StartState
 	for _, char := range input {

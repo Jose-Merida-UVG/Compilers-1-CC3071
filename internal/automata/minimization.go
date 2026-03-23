@@ -5,11 +5,15 @@ import (
 	"sort"
 )
 
+// Minimize reduces the DFA to its minimal equivalent using Hopcroft's
+// partition-refinement algorithm. States that are indistinguishable —
+// same acceptance class and identical transition targets for every symbol —
+// are merged into a single representative state.
 func (dfa *DFA) Minimize() *DFA {
 	alphabet := dfa.Alphabet()
 
-	// Initial partitioning: non-accept states (TokenID=0) in one group,
-	// each distinct TokenID in its own group (so token classes are never merged).
+	// Initial partitioning: non-accepting states share one group; each distinct
+	// TokenID gets its own group so patterns are never collapsed into each other.
 	tokenGroups := make(map[int][]*DFAState)
 	for _, state := range dfa.GetAllStates() {
 		tokenGroups[state.TokenID] = append(tokenGroups[state.TokenID], state)
@@ -89,8 +93,13 @@ func partitionsAreEqual(p1, p2 [][]*DFAState) bool {
 	return true
 }
 
+// minimizeRecursive performs one refinement pass over the current partitions.
+// States within a group are re-split if they disagree on which partition a
+// symbol leads to. Groups whose members all produce the same transition hash
+// stay together; diverging members form new sub-groups.
 func minimizeRecursive(alphabet map[rune]bool, partitions [][]*DFAState) [][]*DFAState {
 	newPartitions := [][]*DFAState{}
+	// Map state ID → its current partition index for O(1) lookups in transitionHash.
 	partitionLookup := make(map[int]int)
 	for index, partition := range partitions {
 		for _, state := range partition {
@@ -98,6 +107,8 @@ func minimizeRecursive(alphabet map[rune]bool, partitions [][]*DFAState) [][]*DF
 		}
 	}
 	for _, partition := range partitions {
+		// Group states by their transition signature — states with the same hash
+		// land in the same partition after this pass.
 		hashToStates := make(map[string][]*DFAState)
 		for _, state := range partition {
 			hash := transitionHash(state, alphabet, partitionLookup)
@@ -109,6 +120,9 @@ func minimizeRecursive(alphabet map[rune]bool, partitions [][]*DFAState) [][]*DF
 	}
 	return newPartitions
 }
+
+// transitionHash encodes a state's outgoing transitions as a string so that
+// states with identical behaviour produce the same hash and can be merged.
 
 func (dfa *DFA) GetAllStates() []*DFAState {
 	visited := make(map[int]bool)

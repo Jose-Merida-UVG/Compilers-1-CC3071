@@ -64,9 +64,9 @@ export default function App() {
       // Parse .dfa.json files as DFA graph data — rendered as DFA viewer, not Monaco.
       let dfaData: DFAGraphData | undefined;
       let label = node.name;
-      if (node.path.endsWith(".dfa")) {
+      if (node.path.endsWith(".dfa.json") || node.path.endsWith(".dfa")) {
         try { dfaData = JSON.parse(content) as DFAGraphData; } catch { /* fall through */ }
-        label = node.name.replace(/\.dfa$/, ""); // show just the spec name
+        label = node.name.replace(/\.dfa\.json$/, "").replace(/\.dfa$/, "");
       }
       setTabs((prev) => [...prev, { path: node.path, label, content, isDirty: false, dfaData }]);
       setActiveTab(node.path);

@@ -1,0 +1,51 @@
+10abc
+99z
+0xFF1G
+3hello
+
+iffy
+forloop
+returnValue
+trueblue
+nilcheck
+packageName
+structField
+constValue
+
+package
+import
+func
+var
+const
+type
+struct
+if
+else
+for
+return
+true
+false
+nil
+
+x := 1
+x == y
+x != y
+x <= y
+x >= y
+x <- y
+x++
+x--
+x += 1
+x -= 1
+x *= 2
+x /= 2
+
+type Point struct {
+    x int
+    y int
+}
+
+@@bad
+x + @@ y
+$$$
+???

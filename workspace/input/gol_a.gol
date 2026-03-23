@@ -1,0 +1,40 @@
+package main
+
+func add(x, y) {
+    return x + y
+}
+
+func main() {
+    var x = 10
+    var y = 3.14
+    var h = 0xFF
+    const z = 0xBEEF
+
+    if x > 0 {
+        x += 1
+        x++
+    } else {
+        x -= 1
+        x--
+    }
+
+    for i := 0; i < 10; i++ {
+        x *= 2
+        x /= 3
+        x %= 7
+    }
+
+    a := true
+    b := false
+    c := nil
+
+    a && b
+    a || b
+    !a
+
+    x == y
+    x != y
+    x <= y
+    x >= y
+    ch <- x
+}

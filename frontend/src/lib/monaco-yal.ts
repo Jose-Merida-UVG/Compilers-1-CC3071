@@ -4,6 +4,52 @@ import type * as Monaco from "monaco-editor";
  * Registers the "yalex" language with Monaco for .yal files.
  * Provides syntax highlighting for keywords, comments, strings, and operators.
  */
+export function registerOutLanguage(monaco: typeof Monaco) {
+  if (monaco.languages.getLanguages().some((l) => l.id === "lexout")) return;
+
+  monaco.languages.register({ id: "lexout", extensions: [".out"] });
+
+  monaco.languages.setMonarchTokensProvider("lexout", {
+    tokenizer: {
+      root: [
+        // ERROR lines
+        [/^ERROR\b.*$/, "out.error"],
+        // token name at start of line (all caps word)
+        [/^[A-Z][A-Z0-9_]+/, "out.token"],
+        // quoted lexeme
+        [/"[^"]*"/, "out.lexeme"],
+        // ln= col= labels
+        [/\b(ln|col)=/, "out.label"],
+        // numbers (line/col values and ranges like 5-6)
+        [/\d+(-\d+)?/, "out.number"],
+        [/\s+/, "white"],
+      ],
+    },
+  });
+
+  // Rules are added into the existing yalex-dark theme via addExtraTokenThemeRules
+  monaco.editor.defineTheme("yalex-dark-out", {
+    base: "vs-dark",
+    inherit: true,
+    rules: [
+      { token: "out.error",  foreground: "f87171", fontStyle: "bold" },
+      { token: "out.token",  foreground: "4ade80", fontStyle: "bold" },
+      { token: "out.lexeme", foreground: "fbbf24" },
+      { token: "out.label",  foreground: "546e7a" },
+      { token: "out.number", foreground: "89ddff" },
+    ],
+    colors: {
+      "editor.background":           "#14141a",
+      "editor.foreground":           "#e2e2e6",
+      "editorLineNumber.foreground": "#3a3a4a",
+      "editorLineNumber.activeForeground": "#7c6af7",
+      "editor.lineHighlightBackground": "#1c1c26",
+      "editorCursor.foreground":     "#8b5cf6",
+      "editor.selectionBackground":  "#3b3170",
+    },
+  });
+}
+
 export function registerYALLanguage(monaco: typeof Monaco) {
   if (monaco.languages.getLanguages().some((l) => l.id === "yalex")) return;
 

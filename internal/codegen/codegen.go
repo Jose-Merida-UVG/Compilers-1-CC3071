@@ -226,7 +226,7 @@ func (l *Lexer) Scan() int {
 			break
 		}
 		if tok == ERROR {
-			fmt.Printf("ERROR  %%-20q  ln=%%d col=%%d\n", l.Lxm, l.Ln, l.Col)
+			fmt.Printf("ERROR  %%-20q  ln=%%d col=%%d-%%d\n", l.Lxm, l.Ln, l.Col, l.Col+len([]rune(l.Lxm))-1)
 			continue
 		}
 		fmt.Printf("%%d  %%-20q  ln=%%d col=%%d\n", tok, l.Lxm, l.Ln, l.Col)

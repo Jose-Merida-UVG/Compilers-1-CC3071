@@ -1,3 +1,16 @@
+// Package automata converts preprocessed regex token sequences into minimized
+// DFAs and combines them into a single scanner automaton.
+//
+// The pipeline for a single pattern is:
+//   - compile.go: orchestrates the full flow — regex → AST → table → DFA → minimize
+//   - direct.go:  builds the DFA directly from the syntax tree (direct method),
+//                 computing nullable/firstpos/lastpos/followpos on the AST nodes
+//   - minimization.go: Hopcroft partition-refinement minimization + state rebuild
+//   - dfa.go:     DFA/DFAState structs, transitions, alphabet, simulation helpers
+//
+// For multi-pattern lexers, Merge() in compile.go runs parallel simulation over
+// all per-pattern DFAs to produce one combined minimized DFA with first-rule-wins
+// priority baked in.
 package automata
 
 import (
@@ -14,10 +27,10 @@ func Compile(rs *regex.RegexString) *DFA {
 	return table.ToDFA().Minimize()
 }
 
-// Merge combines multiple DFAs into a single minimized DFA that accepts the
-// union of all their languages. It uses parallel simulation: each state in the
-// merged DFA is a tuple of per-DFA state IDs (-1 = dead). When a tuple is
-// accepting, the lowest-indexed DFA wins (first-rule-wins priority).
+// Merge combines multiple per-pattern DFAs into one minimized DFA.
+// Each state in the result is a tuple of per-DFA state IDs (-1 = dead/no
+// transition). Accepting tuples resolve priority by lowest index — first-rule-wins.
+// The merged DFA is minimized again so equivalent merged states are collapsed.
 func Merge(dfas []*DFA) *DFA {
 	if len(dfas) == 0 {
 		return nil
@@ -25,7 +38,8 @@ func Merge(dfas []*DFA) *DFA {
 
 	n := len(dfas)
 
-	// Build ID→*DFAState lookup for each input DFA.
+	// Build ID → *DFAState lookup for each input DFA so we can follow
+	// transitions by ID during the BFS without pointer indirection issues.
 	stateByID := make([]map[int]*DFAState, n)
 	for i, dfa := range dfas {
 		stateByID[i] = make(map[int]*DFAState)

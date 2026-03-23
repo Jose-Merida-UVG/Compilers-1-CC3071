@@ -8,11 +8,16 @@ import (
 	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/regex"
 )
 
+// DirectTable holds the followpos data computed from the augmented regex AST.
 type DirectTable struct {
-	NextPos    map[int]map[int]bool
-	PosToChar  map[int]rune
+	// Nextpos mapping ID -> set of IDs
+	NextPos map[int]map[int]bool
+	// PosToChar mapping ID -> rune
+	PosToChar map[int]rune
+	// Starting state for the DFA
 	StartState []int
-	AcceptID   int
+	// ID of sentinel
+	AcceptID int
 }
 
 func BuildDirectTable(root *ds.Node[regex.ASTNodeData]) *DirectTable {
@@ -29,37 +34,69 @@ func BuildDirectTable(root *ds.Node[regex.ASTNodeData]) *DirectTable {
 	return table
 }
 
+// computeAttributes calculates Nullable, FirstPos, and LastPos for each node
+// in the AST built for direct DFA conversion using a recursive approach for
+// post-order traversal. It also populates the DirectTable with NextPos and
+// PosToChar mappings.
 func computeAttributes(node *ds.Node[regex.ASTNodeData], table *DirectTable) {
 	if node == nil {
 		return
 	}
+
+	// Recursive call for left child
 	computeAttributes(node.Left, table)
+
+	// Recursive call for right child
 	computeAttributes(node.Right, table)
 
+	// Base case: we're at a leaf node
 	if node.Left == nil && node.Right == nil {
+		// Nullable, FirstPos, and LastPos are already correctly initialized
+		// during AST construction in BuildDirectAST.
 		if node.Value.Value != regex.RuneEpsilon {
 			table.PosToChar[node.Value.ID] = node.Value.Value
+			// If it's the end-marker sentinel, store its ID as the accept position
 			if node.Value.Value == regex.RuneEndMarker {
 				table.AcceptID = node.Value.ID
 			}
 		}
 		return
+
+	// Handle OR
 	} else if node.Value.Value == '|' {
+		// Nullable = Nullable(L) || Nullable(R)
 		node.Value.Nullable = node.Left.Value.Nullable || node.Right.Value.Nullable
+		// FirstPos = U(L.firstPos, R.firstPos)
 		node.Value.FirstPos = union(node.Left.Value.FirstPos, node.Right.Value.FirstPos)
+		// LastPos = U(L.lastPos, R.lastPos)
 		node.Value.LastPos = union(node.Left.Value.LastPos, node.Right.Value.LastPos)
+
 	} else if node.Value.Value == '~' {
+		// Concatenation operator
+
+		// Nullable = Nullable(L) && Nullable(R)
 		node.Value.Nullable = node.Left.Value.Nullable && node.Right.Value.Nullable
+
+		// FirstPos depends on nullability of left child
 		if node.Left.Value.Nullable {
+			// FirstPos = U(L.firstPos, R.firstPos)
 			node.Value.FirstPos = union(node.Left.Value.FirstPos, node.Right.Value.FirstPos)
 		} else {
+			// FirstPos = L.firstPos
 			node.Value.FirstPos = copySlice(node.Left.Value.FirstPos)
 		}
+
+		// LastPos depends on nullability of right child
 		if node.Right.Value.Nullable {
+			// LastPos = U(L.lastPos, R.lastPos)
 			node.Value.LastPos = union(node.Left.Value.LastPos, node.Right.Value.LastPos)
 		} else {
+			// LastPos = R.lastPos
 			node.Value.LastPos = copySlice(node.Right.Value.LastPos)
 		}
+
+		// Update NextPos for concatenation:
+		// for every position in LastPos(L), every position in FirstPos(R) is a nextpos
 		for _, posInLastLeft := range node.Left.Value.LastPos {
 			if _, exists := table.NextPos[posInLastLeft]; !exists {
 				table.NextPos[posInLastLeft] = make(map[int]bool)
@@ -68,10 +105,20 @@ func computeAttributes(node *ds.Node[regex.ASTNodeData], table *DirectTable) {
 				table.NextPos[posInLastLeft][posInFirstRight] = true
 			}
 		}
+
 	} else if node.Value.Value == '*' {
+		// Kleene star operator
+
+		// Nullable = true by definition
 		node.Value.Nullable = true
+		// FirstPos = L.firstPos
 		node.Value.FirstPos = copySlice(node.Left.Value.FirstPos)
+		// LastPos = L.lastPos
 		node.Value.LastPos = copySlice(node.Left.Value.LastPos)
+
+		// Update NextPos for Kleene star:
+		// for every position in LastPos(L), every position in FirstPos(L) is a nextpos
+		// (the loop back to the start of the repeated sub-expression)
 		for _, posInLastLeft := range node.Left.Value.LastPos {
 			if _, exists := table.NextPos[posInLastLeft]; !exists {
 				table.NextPos[posInLastLeft] = make(map[int]bool)
@@ -104,6 +151,9 @@ func copySlice(a []int) []int {
 	return res
 }
 
+// ToDFA runs subset construction on the followpos table to produce a DFA.
+// Each DFA state corresponds to a set of leaf positions; a state is accepting
+// when its position set contains the end-marker position (AcceptID).
 func (table *DirectTable) ToDFA() *DFA {
 	stateMap := make(map[string]*DFAState)
 
@@ -127,10 +177,12 @@ func (table *DirectTable) ToDFA() *DFA {
 		return false
 	}
 
+	// Seed the BFS with the start state (firstpos of the root)
 	queue := [][]int{}
 	startSet := table.StartState
 	startKey := setKey(startSet)
 	startState := NewDFAState()
+	// A position set is accepting if it contains the end-marker position
 	if contains(startSet, table.AcceptID) {
 		startState.SetToken(1)
 	}
@@ -143,6 +195,7 @@ func (table *DirectTable) ToDFA() *DFA {
 		currentKey := setKey(currentSet)
 		currentDFAState := stateMap[currentKey]
 
+		// Build the alphabet from all non-sentinel positions
 		alphabet := make(map[rune]bool)
 		for _, char := range table.PosToChar {
 			if char != regex.RuneEndMarker {
@@ -151,6 +204,8 @@ func (table *DirectTable) ToDFA() *DFA {
 		}
 
 		for symbol := range alphabet {
+			// Compute move(currentSet, symbol): union of nextpos for every position
+			// in the current set that matches this symbol
 			newSetMap := make(map[int]bool)
 			for _, pos := range currentSet {
 				if table.PosToChar[pos] == symbol {
@@ -167,6 +222,7 @@ func (table *DirectTable) ToDFA() *DFA {
 				newSet = append(newSet, id)
 			}
 			newKey := setKey(newSet)
+			// Only create a new DFA state if this position set is new
 			if _, exists := stateMap[newKey]; !exists {
 				newState := NewDFAState()
 				if contains(newSet, table.AcceptID) {

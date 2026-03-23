@@ -37,6 +37,11 @@ func (regex *RegexString) HandleSpecialOperators() {
 				if currChar.Kind == RParen {
 					result = append(result, Token{Kind: RParen, Value: ')'})
 					openParIndex := findOpenPar(result, len(result)-1)
+					if openParIndex < 0 {
+						result = append(result, currChar)
+						i++
+						continue
+					}
 					result = slices.Insert(result, openParIndex, Token{Kind: LParen, Value: '('})
 					result = append(result, Token{Kind: Alt, Value: '|'})
 					result = append(result, epsToken())
@@ -53,6 +58,11 @@ func (regex *RegexString) HandleSpecialOperators() {
 				if currChar.Kind == RParen {
 					result = append(result, Token{Kind: RParen, Value: ')'})
 					openParIndex := findOpenPar(result, len(result)-1)
+					if openParIndex < 0 {
+						result = append(result, currChar)
+						i++
+						continue
+					}
 					resultLen := len(result) - 1
 					for j := openParIndex; j <= resultLen; j++ {
 						result = append(result, result[j])

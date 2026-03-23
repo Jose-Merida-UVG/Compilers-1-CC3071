@@ -189,21 +189,26 @@ func (table *DirectTable) ToDFA() *DFA {
 	stateMap[startKey] = startState
 	queue = append(queue, startSet)
 
+	// Build the alphabet once from all non-sentinel positions.
+	alphabet := make(map[rune]bool)
+	for _, char := range table.PosToChar {
+		if char != regex.RuneEndMarker {
+			alphabet[char] = true
+		}
+	}
+	var sortedAlpha []rune
+	for r := range alphabet {
+		sortedAlpha = append(sortedAlpha, r)
+	}
+	sort.Slice(sortedAlpha, func(i, j int) bool { return sortedAlpha[i] < sortedAlpha[j] })
+
 	for len(queue) > 0 {
 		currentSet := queue[0]
 		queue = queue[1:]
 		currentKey := setKey(currentSet)
 		currentDFAState := stateMap[currentKey]
 
-		// Build the alphabet from all non-sentinel positions
-		alphabet := make(map[rune]bool)
-		for _, char := range table.PosToChar {
-			if char != regex.RuneEndMarker {
-				alphabet[char] = true
-			}
-		}
-
-		for symbol := range alphabet {
+		for _, symbol := range sortedAlpha {
 			// Compute move(currentSet, symbol): union of nextpos for every position
 			// in the current set that matches this symbol
 			newSetMap := make(map[int]bool)

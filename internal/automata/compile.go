@@ -14,6 +14,7 @@
 package automata
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 
@@ -58,12 +59,17 @@ func Merge(dfas []*DFA) *DFA {
 
 	// Union of all alphabets — the merged DFA must handle every symbol any
 	// individual DFA could ever see.
-	alphabet := make(map[rune]bool)
+	alphaSet := make(map[rune]bool)
 	for _, dfa := range dfas {
 		for r := range dfa.Alphabet() {
-			alphabet[r] = true
+			alphaSet[r] = true
 		}
 	}
+	var alphabet []rune
+	for r := range alphaSet {
+		alphabet = append(alphabet, r)
+	}
+	sort.Slice(alphabet, func(i, j int) bool { return alphabet[i] < alphabet[j] })
 
 	// A multiState is a slice of n state IDs, one per input DFA.
 	// -1 means that DFA has no transition for the current path (dead).
@@ -119,7 +125,7 @@ func Merge(dfas []*DFA) *DFA {
 		queue = queue[1:]
 		currentState := resultMap[keyOf(current)]
 
-		for sym := range alphabet {
+		for _, sym := range alphabet {
 			// Advance every component DFA by sym.
 			// If a component is already dead (-1) or has no transition for sym,
 			// it stays dead (-1) in the next multiState.

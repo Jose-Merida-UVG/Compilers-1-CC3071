@@ -78,8 +78,9 @@ func replaceIdent(s, ident, repl string) string {
 	var out []byte
 	i := 0
 	for i < len(s) {
-		// Skip double-quoted strings verbatim.
-		if s[i] == '"' {
+		// Skip quoted strings/chars verbatim so identifiers inside are not replaced.
+		if s[i] == '"' || s[i] == '\'' {
+			q := s[i]
 			out = append(out, s[i])
 			i++
 			for i < len(s) {
@@ -87,7 +88,7 @@ func replaceIdent(s, ident, repl string) string {
 				if s[i] == '\\' && i+1 < len(s) {
 					i++
 					out = append(out, s[i])
-				} else if s[i] == '"' {
+				} else if s[i] == q {
 					i++
 					break
 				}

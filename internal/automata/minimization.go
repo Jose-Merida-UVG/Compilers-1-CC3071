@@ -44,6 +44,14 @@ func (dfa *DFA) Minimize() *DFA {
 }
 
 func (dfa *DFA) dfaFromPartitions(partitions [][]*DFAState, alphabet map[rune]bool) *DFA {
+	// O(1) lookup: state ID → partition index
+	stateToPartition := make(map[int]int)
+	for idx, partition := range partitions {
+		for _, s := range partition {
+			stateToPartition[s.ID] = idx
+		}
+	}
+
 	partitionToState := make(map[int]*DFAState)
 	for index, partition := range partitions {
 		newState := NewDFAState()
@@ -55,18 +63,26 @@ func (dfa *DFA) dfaFromPartitions(partitions [][]*DFAState, alphabet map[rune]bo
 		}
 		partitionToState[index] = newState
 	}
+
+	// Sort alphabet for deterministic transitions
+	var sortedAlpha []rune
+	for r := range alphabet {
+		sortedAlpha = append(sortedAlpha, r)
+	}
+	sort.Slice(sortedAlpha, func(i, j int) bool { return sortedAlpha[i] < sortedAlpha[j] })
+
 	for partitionIndex, partition := range partitions {
 		newState := partitionToState[partitionIndex]
 		for _, state := range partition {
-			for symbol := range alphabet {
+			for _, symbol := range sortedAlpha {
 				if nextState, exists := state.Transitions[symbol]; exists {
-					nextPartition := findPartition(nextState, partitions)
+					nextPartition := stateToPartition[nextState.ID]
 					newState.AddTransition(partitionToState[nextPartition], symbol)
 				}
 			}
 		}
 	}
-	startPartition := findPartition(dfa.StartState, partitions)
+	startPartition := stateToPartition[dfa.StartState.ID]
 	return NewDFA(partitionToState[startPartition])
 }
 
@@ -114,8 +130,13 @@ func minimizeRecursive(alphabet map[rune]bool, partitions [][]*DFAState) [][]*DF
 			hash := transitionHash(state, alphabet, partitionLookup)
 			hashToStates[hash] = append(hashToStates[hash], state)
 		}
-		for _, states := range hashToStates {
-			newPartitions = append(newPartitions, states)
+		var hashes []string
+		for h := range hashToStates {
+			hashes = append(hashes, h)
+		}
+		sort.Strings(hashes)
+		for _, h := range hashes {
+			newPartitions = append(newPartitions, hashToStates[h])
 		}
 	}
 	return newPartitions

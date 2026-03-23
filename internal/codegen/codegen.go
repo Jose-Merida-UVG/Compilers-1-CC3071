@@ -228,7 +228,6 @@ func (l *Lexer) Scan() int {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	fmt.Printf("=== %%s ===\n%%s\n=== tokens ===\n", os.Args[1], string(data))
 	l := New%sLexer(string(data))
 	for {
 		tok := l.Scan()

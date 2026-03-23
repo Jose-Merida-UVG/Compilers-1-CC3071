@@ -1,14 +1,10 @@
-(* gol.yal - Go-like language, near-full spec               *)
-(* Showcases: string literals, negation, set diff,          *)
-(* deep nesting, wildcard, explicit bad-literal error rule   *)
-
-(* Token value declarations *)
+(* Go-like language lexer *)
 {
     const (
         INT    = 1
         FLOAT  = 2
         HEX    = 3
-        BADLIT = 4  (* digit sequence immediately followed by a letter *)
+        BADLIT = 4
 
         KWPACKAGE = 5
         KWIMPORT  = 6
@@ -26,22 +22,21 @@
         KWNIL     = 18
 
         IDENT  = 19
-
-        DEFINE = 20  (* :=  *)
-        PLEQ   = 21  (* +=  *)
-        MIEQ   = 22  (* -=  *)
-        TIEQ   = 23  (* *=  *)
-        DIEQ   = 24  (* /=  *)
-        INC    = 25  (* ++  *)
-        DEC    = 26  (* --  *)
-        EQ     = 27  (* ==  *)
-        NEQ    = 28  (* !=  *)
-        LEQ    = 29  (* <=  *)
-        GEQ    = 30  (* >=  *)
-        AND    = 31  (* &&  *)
-        OR     = 32  (* ||  *)
-        ARROW  = 33  (* <-  *)
-        ASSN   = 34  (* =   *)
+        DEFINE = 20
+        PLEQ   = 21
+        MIEQ   = 22
+        TIEQ   = 23
+        DIEQ   = 24
+        INC    = 25
+        DEC    = 26
+        EQ     = 27
+        NEQ    = 28
+        LEQ    = 29
+        GEQ    = 30
+        AND    = 31
+        OR     = 32
+        ARROW  = 33
+        ASSN   = 34
         PLUS   = 35
         MINUS  = 36
         TIMES  = 37
@@ -65,110 +60,88 @@
     )
 }
 
-(* Level 1: primitive classes *)
 let digit   = ['0'-'9']
 let lower   = ['a'-'z']
 let upper   = ['A'-'Z']
 let hexdig  = ['0'-'9' 'a'-'f' 'A'-'F']
-
-(* Level 2: composed *)
 let alpha   = lower | upper | '_'
-
-(* Level 3: composed from level 2 *)
 let alnum   = alpha | digit
-
-(* Level 4: full token patterns *)
 let int     = digit+
 let float   = digit+ '.' digit+
 let hex     = '0' ('x' | 'X') hexdig+
 let ident   = alpha alnum*
-
-(* Bad literal: digit run immediately touching a letter     *)
-(* Listed before int so maximal munch grabs the whole thing *)
-(* e.g. 10abc -> BADLIT, not INT then IDENT                 *)
 let badlit  = digit+ alpha alnum*
-
-(* Negated class: any printable char that is NOT a digit    *)
-(* Used to tighten the badlit concept in comments/docs      *)
 let nondigit = [^'0'-'9']
-
-(* Any printable ASCII that isn't alphanumeric or whitespace *)
-(* Handy named concept for "punctuation / operator chars"   *)
 let punct   = _ # ['a'-'z' 'A'-'Z' '0'-'9' '_' ' ' '\t' '\n' '\r']
+let define  = ":="
+let pleq    = "+="
+let mieq    = "-="
+let tieq    = "*="
+let dieq    = "/="
+let inc     = "++"
+let dec     = "--"
+let eq      = "=="
+let neq     = "!="
+let leq     = "<="
+let geq     = ">="
+let and     = "&&"
+let or      = "||"
+let arrow   = "<-"
+let ws      = [' ' '\t' '\n' '\r']
 
-(* Multi-char operators as string literals *)
-let define = ":="
-let pleq   = "+="
-let mieq   = "-="
-let tieq   = "*="
-let dieq   = "/="
-let inc    = "++"
-let dec    = "--"
-let eq     = "=="
-let neq    = "!="
-let leq    = "<="
-let geq    = ">="
-let and    = "&&"
-let or     = "||"
-let arrow  = "<-"
-
-(* Whitespace *)
-let ws = [' ' '\t' '\n' '\r']
-
-(* Rules *)
 rule gettoken =
   ws+        {  }
-| float      { fmt.Print("FLOAT     "); return FLOAT }
-| hex        { fmt.Print("HEX       "); return HEX }
-| badlit     { fmt.Print("BADLIT    "); return BADLIT }
-| int        { fmt.Print("INT       "); return INT }
-| define     { fmt.Print("DEFINE    "); return DEFINE }
-| pleq       { fmt.Print("PLEQ      "); return PLEQ }
-| mieq       { fmt.Print("MIEQ      "); return MIEQ }
-| tieq       { fmt.Print("TIEQ      "); return TIEQ }
-| dieq       { fmt.Print("DIEQ      "); return DIEQ }
-| inc        { fmt.Print("INC       "); return INC }
-| dec        { fmt.Print("DEC       "); return DEC }
-| eq         { fmt.Print("EQ        "); return EQ }
-| neq        { fmt.Print("NEQ       "); return NEQ }
-| leq        { fmt.Print("LEQ       "); return LEQ }
-| geq        { fmt.Print("GEQ       "); return GEQ }
-| and        { fmt.Print("AND       "); return AND }
-| or         { fmt.Print("OR        "); return OR }
-| arrow      { fmt.Print("ARROW     "); return ARROW }
-| '+'        { fmt.Print("PLUS      "); return PLUS }
-| '-'        { fmt.Print("MINUS     "); return MINUS }
-| '*'        { fmt.Print("TIMES     "); return TIMES }
-| '/'        { fmt.Print("DIV       "); return DIV }
-| '%'        { fmt.Print("MOD       "); return MOD }
-| '='        { fmt.Print("ASSN      "); return ASSN }
-| '<'        { fmt.Print("LT        "); return LT }
-| '>'        { fmt.Print("GT        "); return GT }
-| '!'        { fmt.Print("NOT       "); return NOT }
-| '&'        { fmt.Print("AMP       "); return AMP }
-| '|'        { fmt.Print("PIPE      "); return PIPE }
-| '{'        { fmt.Print("LBRACE    "); return LBRACE }
-| '}'        { fmt.Print("RBRACE    "); return RBRACE }
-| '('        { fmt.Print("LPAREN    "); return LPAREN }
-| ')'        { fmt.Print("RPAREN    "); return RPAREN }
-| '['        { fmt.Print("LBRACK    "); return LBRACK }
-| ']'        { fmt.Print("RBRACK    "); return RBRACK }
-| ';'        { fmt.Print("SEMI      "); return SEMI }
-| ':'        { fmt.Print("COLON     "); return COLON }
-| '.'        { fmt.Print("DOT       "); return DOT }
-| ','        { fmt.Print("COMMA     "); return COMMA }
-| "package"  { fmt.Print("KWPACKAGE "); return KWPACKAGE }
-| "import"   { fmt.Print("KWIMPORT  "); return KWIMPORT }
-| "func"     { fmt.Print("KWFUNC    "); return KWFUNC }
-| "var"      { fmt.Print("KWVAR     "); return KWVAR }
-| "const"    { fmt.Print("KWCONST   "); return KWCONST }
-| "type"     { fmt.Print("KWTYPE    "); return KWTYPE }
-| "struct"   { fmt.Print("KWSTRUCT  "); return KWSTRUCT }
-| "if"       { fmt.Print("KWIF      "); return KWIF }
-| "else"     { fmt.Print("KWELSE    "); return KWELSE }
-| "for"      { fmt.Print("KWFOR     "); return KWFOR }
-| "return"   { fmt.Print("KWRETURN  "); return KWRETURN }
-| "true"     { fmt.Print("KWTRUE    "); return KWTRUE }
-| "false"    { fmt.Print("KWFALSE   "); return KWFALSE }
-| "nil"      { fmt.Print("KWNIL     "); return KWNIL }
-| ident      { fmt.Print("IDENT     "); return IDENT }
+| float      { fmt.Print("FLOAT    "); return FLOAT }
+| hex        { fmt.Print("HEX      "); return HEX }
+| badlit     { fmt.Print("BADLIT   "); return BADLIT }
+| int        { fmt.Print("INT      "); return INT }
+| define     { fmt.Print("DEFINE   "); return DEFINE }
+| pleq       { fmt.Print("PLEQ     "); return PLEQ }
+| mieq       { fmt.Print("MIEQ     "); return MIEQ }
+| tieq       { fmt.Print("TIEQ     "); return TIEQ }
+| dieq       { fmt.Print("DIEQ     "); return DIEQ }
+| inc        { fmt.Print("INC      "); return INC }
+| dec        { fmt.Print("DEC      "); return DEC }
+| eq         { fmt.Print("EQ       "); return EQ }
+| neq        { fmt.Print("NEQ      "); return NEQ }
+| leq        { fmt.Print("LEQ      "); return LEQ }
+| geq        { fmt.Print("GEQ      "); return GEQ }
+| and        { fmt.Print("AND      "); return AND }
+| or         { fmt.Print("OR       "); return OR }
+| arrow      { fmt.Print("ARROW    "); return ARROW }
+| '+'        { fmt.Print("PLUS     "); return PLUS }
+| '-'        { fmt.Print("MINUS    "); return MINUS }
+| '*'        { fmt.Print("TIMES    "); return TIMES }
+| '/'        { fmt.Print("DIV      "); return DIV }
+| '%'        { fmt.Print("MOD      "); return MOD }
+| '='        { fmt.Print("ASSN     "); return ASSN }
+| '<'        { fmt.Print("LT       "); return LT }
+| '>'        { fmt.Print("GT       "); return GT }
+| '!'        { fmt.Print("NOT      "); return NOT }
+| '&'        { fmt.Print("AMP      "); return AMP }
+| '|'        { fmt.Print("PIPE     "); return PIPE }
+| '{'        { fmt.Print("LBRACE   "); return LBRACE }
+| '}'        { fmt.Print("RBRACE   "); return RBRACE }
+| '('        { fmt.Print("LPAREN   "); return LPAREN }
+| ')'        { fmt.Print("RPAREN   "); return RPAREN }
+| '['        { fmt.Print("LBRACK   "); return LBRACK }
+| ']'        { fmt.Print("RBRACK   "); return RBRACK }
+| ';'        { fmt.Print("SEMI     "); return SEMI }
+| ':'        { fmt.Print("COLON    "); return COLON }
+| '.'        { fmt.Print("DOT      "); return DOT }
+| ','        { fmt.Print("COMMA    "); return COMMA }
+| "package"  { fmt.Print("PACKAGE  "); return KWPACKAGE }
+| "import"   { fmt.Print("IMPORT   "); return KWIMPORT }
+| "func"     { fmt.Print("FUNC     "); return KWFUNC }
+| "var"      { fmt.Print("VAR      "); return KWVAR }
+| "const"    { fmt.Print("CONST    "); return KWCONST }
+| "type"     { fmt.Print("TYPE     "); return KWTYPE }
+| "struct"   { fmt.Print("STRUCT   "); return KWSTRUCT }
+| "if"       { fmt.Print("IF       "); return KWIF }
+| "else"     { fmt.Print("ELSE     "); return KWELSE }
+| "for"      { fmt.Print("FOR      "); return KWFOR }
+| "return"   { fmt.Print("RETURN   "); return KWRETURN }
+| "true"     { fmt.Print("TRUE     "); return KWTRUE }
+| "false"    { fmt.Print("FALSE    "); return KWFALSE }
+| "nil"      { fmt.Print("NIL      "); return KWNIL }
+| ident      { fmt.Print("IDENT    "); return IDENT }

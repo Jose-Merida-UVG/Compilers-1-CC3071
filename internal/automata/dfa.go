@@ -1,10 +1,5 @@
 package automata
 
-import (
-	"fmt"
-	"sort"
-)
-
 // DFA is the top-level automaton. Only the start state is stored; all other
 // states are reachable by following Transitions recursively.
 type DFA struct {
@@ -59,20 +54,6 @@ func (dfa *DFA) Alphabet() map[rune]bool {
 	return alphabet
 }
 
-// Sim runs the DFA on input and returns whether it ends in an accepting state.
-// Used for testing; the generated lexer drives the DFA tables directly.
-func (dfa *DFA) Sim(input string) bool {
-	currentState := dfa.StartState
-	for _, char := range input {
-		nextState := currentState.Transitions[char]
-		if nextState == nil {
-			return false
-		}
-		currentState = nextState
-	}
-	return currentState.Accept
-}
-
 func dfaAlphabetRecursive(state *DFAState, alphabet map[rune]bool, visited map[int]bool) {
 	if visited[state.ID] {
 		return
@@ -82,45 +63,4 @@ func dfaAlphabetRecursive(state *DFAState, alphabet map[rune]bool, visited map[i
 		alphabet[symbol] = true
 		dfaAlphabetRecursive(nextState, alphabet, visited)
 	}
-}
-
-func (dfa *DFA) PrintTransitionTable() {
-	states := dfa.GetAllStates()
-	alphabet := dfa.Alphabet()
-	var symbols []rune
-	for s := range alphabet {
-		symbols = append(symbols, s)
-	}
-	sort.Slice(symbols, func(i, j int) bool { return symbols[i] < symbols[j] })
-
-	fmt.Println("\n--- Tabla de Transiciones DFA ---")
-	fmt.Printf("Estado\t")
-	for _, s := range symbols {
-		fmt.Printf("%c\t", s)
-	}
-	fmt.Println()
-	for _, state := range states {
-		marker := ""
-		if state.Accept {
-			marker = "*"
-		}
-		fmt.Printf("%d%s\t", state.ID, marker)
-		for _, s := range symbols {
-			if next, ok := state.Transitions[s]; ok {
-				fmt.Printf("%d\t", next.ID)
-			} else {
-				fmt.Printf("-\t")
-			}
-		}
-		fmt.Println()
-	}
-}
-
-func (dfa *DFA) CountTransitions() int {
-	states := dfa.GetAllStates()
-	count := 0
-	for _, state := range states {
-		count += len(state.Transitions)
-	}
-	return count
 }

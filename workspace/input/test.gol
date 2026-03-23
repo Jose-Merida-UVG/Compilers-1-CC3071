@@ -1,0 +1,21 @@
+package main
+
+func add(x, y) {
+	return x + y
+}
+
+func main() {
+	var n = 10
+	const limit = 0xFF
+
+	for i := 0; i < n; i++ {
+		n *= 2
+	}
+
+	if n > limit {
+		n--
+	}
+
+	10abc
+	forloop
+}

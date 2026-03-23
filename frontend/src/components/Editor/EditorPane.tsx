@@ -94,7 +94,7 @@ export default function EditorPane({
               beforeMount={handleBeforeMount}
               onChange={(val) => { if (val !== undefined) onChangeContent(active.path, val); }}
               options={{
-                fontSize: 14,
+                fontSize: 12,
                 lineHeight: 22,
                 fontFamily: '"JetBrains Mono", "Cascadia Code", "Fira Code", monospace',
                 fontLigatures: true,

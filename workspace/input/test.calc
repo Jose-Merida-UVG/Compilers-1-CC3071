@@ -1,0 +1,10 @@
+let x = 0xFF
+let y = 3.14
+
+if x > 0 else y <= 10.0
+x += 2
+a && b || !a
+
+iffy
+if
+0x

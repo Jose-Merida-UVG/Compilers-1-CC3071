@@ -31,18 +31,18 @@ func GenerateLexer(name string, yf *yalex.YalFile, dfa *automata.DFA, actions []
 	var b strings.Builder
 	w := func(format string, args ...any) { fmt.Fprintf(&b, format, args...) }
 
-	// ── package ────────────────────────────────────────────────────────────
 	w("package main\n\n")
 	w("import (\n\t\"fmt\"\n\t\"os\"\n)\n\n")
 
-	// ── sentinel constants ─────────────────────────────────────────────────
 	w("// Sentinel return values for Yylex.\n")
 	w("const (\n")
 	w("\tEOF   = 0  // end of input\n")
 	w("\tERROR = -1 // unrecognised character\n")
 	w(")\n\n")
 
-	// ── positional token ID constants ──────────────────────────────────────
+	// TOKEN_N constants mirror the 1-based TokenID values stored in the DFA's
+	// accept table. They are emitted for reference — the user's named constants
+	// from the header (FLOAT, INT, etc.) are what actions actually return.
 	w("// Token ID constants — one per pattern, in the order they appear in the spec.\n")
 	w("const (\n")
 	for i, action := range actions {
@@ -55,12 +55,10 @@ func GenerateLexer(name string, yf *yalex.YalFile, dfa *automata.DFA, actions []
 	}
 	w(")\n\n")
 
-	// ── user header (verbatim — define named constants, imports, etc.) ─────
 	if header != "" {
 		w("// --- header ---\n%s\n\n", header)
 	}
 
-	// ── Lexer struct ───────────────────────────────────────────────────────
 	w(`// Lexer holds the scanning state between calls to Scan.
 type Lexer struct {
 	input []rune
@@ -74,13 +72,11 @@ type Lexer struct {
 
 `)
 
-	// ── constructor ────────────────────────────────────────────────────────
 	w("// New%sLexer creates a Lexer ready to scan input.\n", exportedName)
 	w("func New%sLexer(input string) *Lexer {\n", exportedName)
 	w("\treturn &Lexer{input: []rune(input), pos: 0, line: 1, col: 1}\n")
 	w("}\n\n")
 
-	// ── DFA transition table ───────────────────────────────────────────────
 	w("// %sTrans is the DFA transition table: stateID → rune → nextStateID.\n", name)
 	w("var %sTrans = map[int]map[rune]int{\n", name)
 	for _, s := range states {
@@ -95,7 +91,6 @@ type Lexer struct {
 	}
 	w("}\n\n")
 
-	// ── accept table ───────────────────────────────────────────────────────
 	w("// %sAccept maps accepting-state IDs to their 1-based TokenID.\n", name)
 	w("var %sAccept = map[int]int{\n", name)
 	for _, s := range states {
@@ -105,7 +100,9 @@ type Lexer struct {
 	}
 	w("}\n\n")
 
-	// ── Scan method ────────────────────────────────────────────────────────
+	// NOTE: all format verbs inside this raw string are for the *generated* file's
+	// fmt.Printf calls, not for this w() call. %% in the template becomes a literal
+	// % in the output; %d / %s here are consumed by w() to splice in startID / name.
 	w(`// Scan advances to the next token and returns its ID.
 // Lxm, Ln, and Col are set before the action runs.
 // Actions that return emit the token to the caller.
@@ -114,18 +111,23 @@ type Lexer struct {
 // Returns EOF (0) at end of input, ERROR (-1) for unrecognised characters.
 func (l *Lexer) Scan() int {
 	for l.pos < len(l.input) {
+		// Snapshot the position at the start of each token attempt.
+		// If the inner loop overshoots, we backtrack here via lastPos/lastLine/lastCol.
 		startPos  := l.pos
 		startLine := l.line
 		startCol  := l.col
 
-		state    := %d
-		lastTok  := 0
+		state    := %d  // start state of the DFA
+		lastTok  := 0   // TokenID of the last accepting state seen (0 = none yet)
 		lastPos  := l.pos
 		lastLine := l.line
 		lastCol  := l.col
 		curLine  := l.line
 		curCol   := l.col
 
+		// Inner loop: maximal munch — keep advancing as long as the DFA has a
+		// transition. Every time we land on an accepting state, snapshot it.
+		// When no transition exists we stop and backtrack to the last snapshot.
 		for l.pos < len(l.input) {
 			ch := l.input[l.pos]
 			row, ok := %sTrans[state]
@@ -145,6 +147,8 @@ func (l *Lexer) Scan() int {
 			}
 			state = next
 			if tok := %sAccept[state]; tok != 0 {
+				// Accepting state — snapshot position and token ID.
+				// A later, longer match may overwrite this snapshot.
 				lastTok  = tok
 				lastPos  = l.pos
 				lastLine = curLine
@@ -153,12 +157,16 @@ func (l *Lexer) Scan() int {
 		}
 
 		if lastTok == 0 {
-			// Group consecutive unrecognised characters into one ERROR token.
+			// No accepting state was ever reached from startPos — unrecognised input.
+			// Consume characters one-by-one until the DFA's start state can fire again,
+			// grouping them all into a single ERROR token rather than one per character.
 			errStart := startPos
 			errLn    := l.line
 			errCol   := l.col
 			for l.pos < len(l.input) {
 				ch := l.input[l.pos]
+				// Stop as soon as the start state has a transition for this char —
+				// the next call to Scan will pick up from here cleanly.
 				if row, ok := %sTrans[%d]; ok {
 					if _, ok := row[ch]; ok {
 						break
@@ -178,6 +186,7 @@ func (l *Lexer) Scan() int {
 			return ERROR
 		}
 
+		// Backtrack to the last accepting snapshot and commit that match.
 		l.pos = lastPos
 		l.line = lastLine
 		l.col  = lastCol
@@ -185,10 +194,12 @@ func (l *Lexer) Scan() int {
 		l.Ln   = startLine
 		l.Col  = startCol
 
+		// Dispatch to the verbatim action for the winning token.
+		// Actions that execute a return statement exit Scan() with that token ID.
+		// Actions without a return fall through and the outer loop retries (skip).
 		switch lastTok {
 `, startID, name, name, name, startID)
 
-	// ── one case per action (verbatim Go) ──────────────────────────────────
 	for i, action := range actions {
 		w("\t\tcase %d:\n", i+1)
 		a := strings.TrimSpace(action)
@@ -203,12 +214,10 @@ func (l *Lexer) Scan() int {
 
 	w("\t\t}\n\t}\n\treturn EOF\n}\n\n")
 
-	// ── user trailer (verbatim) ────────────────────────────────────────────
 	if trailer != "" {
 		w("\n// --- trailer ---\n%s\n", trailer)
 	}
 
-	// ── main entry point ───────────────────────────────────────────────────
 	w(`func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, "usage: %s <inputfile>")
@@ -219,6 +228,7 @@ func (l *Lexer) Scan() int {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	fmt.Printf("=== %%s ===\n%%s\n=== tokens ===\n", os.Args[1], string(data))
 	l := New%sLexer(string(data))
 	for {
 		tok := l.Scan()
@@ -236,8 +246,6 @@ func (l *Lexer) Scan() int {
 
 	return b.String()
 }
-
-// ─── internal helpers ─────────────────────────────────────────────────────────
 
 // capitalize upper-cases the first rune of s.
 func capitalize(s string) string {

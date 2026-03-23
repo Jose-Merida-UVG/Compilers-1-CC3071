@@ -1,8 +1,4 @@
-(* calc.yal - expression calculator, medium complexity      *)
-(* Showcases: string literals for keywords, char class      *)
-(* negation, set difference, nested let defs, wildcard      *)
-
-(* Token value declarations *)
+(* Expression calculator with hex literals, comparison and logic ops *)
 {
     const (
         FLOAT  = 1
@@ -38,78 +34,59 @@
     )
 }
 
-(* Level 1: primitive classes *)
-let digit   = ['0'-'9']
-let lower   = ['a'-'z']
-let upper   = ['A'-'Z']
+let digit  = ['0'-'9']
+let lower  = ['a'-'z']
+let upper  = ['A'-'Z']
+let alpha  = lower | upper | '_'
+let hexdig = ['0'-'9' 'a'-'f' 'A'-'F']
+let alnum  = alpha | digit
+let int    = digit+
+let float  = digit+ '.' digit+
+let hex    = '0' ('x' | 'X') hexdig+
+let ident  = alpha alnum*
+let symbol = _ # ['a'-'z' 'A'-'Z' '0'-'9' '_' ' ' '\t' '\n' '\r']
+let pow    = "**"
+let pleq   = "+="
+let mieq   = "-="
+let tieq   = "*="
+let dieq   = "/="
+let eq     = "=="
+let neq    = "!="
+let leq    = "<="
+let geq    = ">="
+let and    = "&&"
+let or     = "||"
+let ws     = [' ' '\t' '\n' '\r']
 
-(* Level 2: composed from level 1 *)
-let alpha   = lower | upper | '_'
-let hexdig  = ['0'-'9' 'a'-'f' 'A'-'F']
-
-(* Level 3: composed from level 2 *)
-let alnum   = alpha | digit
-
-(* Level 4: full token patterns from level 3 *)
-let int     = digit+
-let float   = digit+ '.' digit+
-let hex     = '0' ('x' | 'X') hexdig+
-let ident   = alpha alnum*
-
-(* Vowels / consonants using set difference - for fun *)
-let vowel     = ['a' 'e' 'i' 'o' 'u' 'A' 'E' 'I' 'O' 'U']
-let consonant = ['a'-'z' 'A'-'Z'] # ['a' 'e' 'i' 'o' 'u' 'A' 'E' 'I' 'O' 'U']
-
-(* Non-alphanumeric printable: wildcard minus alnum and whitespace *)
-(* Useful for catching stray punctuation as a named concept        *)
-let symbol  = _ # ['a'-'z' 'A'-'Z' '0'-'9' '_' ' ' '\t' '\n' '\r']
-
-(* Multi-char operators *)
-let pow  = "**"
-let pleq = "+="
-let mieq = "-="
-let tieq = "*="
-let dieq = "/="
-let eq   = "=="
-let neq  = "!="
-let leq  = "<="
-let geq  = ">="
-let and  = "&&"
-let or   = "||"
-
-(* Whitespace *)
-let ws = [' ' '\t' '\n' '\r']
-
-(* Rules - multi-char ops before their single-char prefixes *)
 rule gettoken =
   ws+    {  }
-| float  { fmt.Print("FLOAT   "); return FLOAT }
-| hex    { fmt.Print("HEX     "); return HEX }
-| int    { fmt.Print("INT     "); return INT }
-| pow    { fmt.Print("POW     "); return POW }
-| pleq   { fmt.Print("PLEQ    "); return PLEQ }
-| mieq   { fmt.Print("MIEQ    "); return MIEQ }
-| tieq   { fmt.Print("TIEQ    "); return TIEQ }
-| dieq   { fmt.Print("DIEQ    "); return DIEQ }
-| eq     { fmt.Print("EQ      "); return EQ }
-| neq    { fmt.Print("NEQ     "); return NEQ }
-| leq    { fmt.Print("LEQ     "); return LEQ }
-| geq    { fmt.Print("GEQ     "); return GEQ }
-| and    { fmt.Print("AND     "); return AND }
-| or     { fmt.Print("OR      "); return OR }
-| '+'    { fmt.Print("PLUS    "); return PLUS }
-| '-'    { fmt.Print("MINUS   "); return MINUS }
-| '*'    { fmt.Print("TIMES   "); return TIMES }
-| '/'    { fmt.Print("DIV     "); return DIV }
-| '%'    { fmt.Print("MOD     "); return MOD }
-| '='    { fmt.Print("ASSN    "); return ASSN }
-| '<'    { fmt.Print("LT      "); return LT }
-| '>'    { fmt.Print("GT      "); return GT }
-| '!'    { fmt.Print("NOT     "); return NOT }
-| '('    { fmt.Print("LPAREN  "); return LPAREN }
-| ')'    { fmt.Print("RPAREN  "); return RPAREN }
-| ','    { fmt.Print("COMMA   "); return COMMA }
-| "let"  { fmt.Print("KWLET   "); return KWLET }
-| "if"   { fmt.Print("KWIF    "); return KWIF }
-| "else" { fmt.Print("KWELSE  "); return KWELSE }
-| ident  { fmt.Print("IDENT   "); return IDENT }
+| float  { fmt.Print("FLOAT  "); return FLOAT }
+| hex    { fmt.Print("HEX    "); return HEX }
+| int    { fmt.Print("INT    "); return INT }
+| pow    { fmt.Print("POW    "); return POW }
+| pleq   { fmt.Print("PLEQ   "); return PLEQ }
+| mieq   { fmt.Print("MIEQ   "); return MIEQ }
+| tieq   { fmt.Print("TIEQ   "); return TIEQ }
+| dieq   { fmt.Print("DIEQ   "); return DIEQ }
+| eq     { fmt.Print("EQ     "); return EQ }
+| neq    { fmt.Print("NEQ    "); return NEQ }
+| leq    { fmt.Print("LEQ    "); return LEQ }
+| geq    { fmt.Print("GEQ    "); return GEQ }
+| and    { fmt.Print("AND    "); return AND }
+| or     { fmt.Print("OR     "); return OR }
+| '+'    { fmt.Print("PLUS   "); return PLUS }
+| '-'    { fmt.Print("MINUS  "); return MINUS }
+| '*'    { fmt.Print("TIMES  "); return TIMES }
+| '/'    { fmt.Print("DIV    "); return DIV }
+| '%'    { fmt.Print("MOD    "); return MOD }
+| '='    { fmt.Print("ASSN   "); return ASSN }
+| '<'    { fmt.Print("LT     "); return LT }
+| '>'    { fmt.Print("GT     "); return GT }
+| '!'    { fmt.Print("NOT    "); return NOT }
+| '('    { fmt.Print("LPAREN "); return LPAREN }
+| ')'    { fmt.Print("RPAREN "); return RPAREN }
+| ','    { fmt.Print("COMMA  "); return COMMA }
+| "let"  { fmt.Print("KWLET  "); return KWLET }
+| "if"   { fmt.Print("KWIF   "); return KWIF }
+| "else" { fmt.Print("KWELSE "); return KWELSE }
+| ident  { fmt.Print("IDENT  "); return IDENT }

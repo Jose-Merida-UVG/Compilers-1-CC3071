@@ -102,7 +102,9 @@ func removeComments(lines []string) ([]string, error) {
 }
 
 // sectionBoundaries holds the line-index ranges for each logical section of a
-// .yal file after comment removal. -1 means the section is absent.
+// .yal file after comment removal. -1 means the section is absent. Originally
+// we had planned to support multiple rule ranges but it's just dead functionality
+// as of now.
 type sectionBoundaries struct {
 	headerStart  int
 	headerEnd    int
@@ -162,6 +164,7 @@ func identifySections(lines []string) (*sectionBoundaries, error) {
 	for i < len(lines) && strings.TrimSpace(lines[i]) == "" {
 		i++
 	}
+
 	// Every line is a let-def until we see the keyword 'rule'
 	firstRule := -1
 	for j := i; j < len(lines); j++ {

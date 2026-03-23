@@ -268,7 +268,7 @@ func (h *apiHandler) getDFA(w http.ResponseWriter, r *http.Request) {
 
 	// Generate and write the Go lexer source file.
 	// codegen.GenerateLexer is a stub — implement it in internal/codegen/codegen.go.
-	goSrc := codegen.GenerateLexer(specBase, body.Path, compiled.DFA, compiled.Actions)
+	goSrc := codegen.GenerateLexer(specBase, yalFile, compiled.DFA, compiled.Actions)
 	os.WriteFile(filepath.Join(h.workspace, "lexers", specBase+".go"), []byte(goSrc), 0o644)
 
 	writeJSON(w, serialized)

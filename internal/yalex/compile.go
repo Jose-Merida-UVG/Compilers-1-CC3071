@@ -2,7 +2,6 @@ package yalex
 
 import (
 	"fmt"
-	"regexp"
 
 	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/automata"
 	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/regex"
@@ -26,16 +25,20 @@ func (f *YalFile) Compile() (*CompiledLexer, error) {
 
 	for _, rule := range f.Rules {
 		for _, pat := range rule.Patterns {
+			// Expand definitions
 			expanded := f.expandDefinitions(pat.Pattern)
+			// Create DFA
 			rs, err := regex.NewRegex(expanded).Preprocess()
 			if err != nil {
 				return nil, fmt.Errorf("rule %q pattern %q: %w", rule.Entrypoint, pat.Pattern, err)
 			}
+			// Store DFA + actions
 			dfas = append(dfas, automata.Compile(rs))
 			actions = append(actions, pat.Action)
 		}
 	}
 
+	// Returned merged + minimized DFA + actions based on token ID.
 	return &CompiledLexer{
 		DFA:     automata.Merge(dfas),
 		Actions: actions,
@@ -48,19 +51,18 @@ func (f *YalFile) Compile() (*CompiledLexer, error) {
 // references between defs are transitively expanded), then applies
 // word-boundary-aware replacement to the rule pattern.
 func (f *YalFile) expandDefinitions(pattern string) string {
-	// resolved[i] holds the fully-expanded regex for f.Definitions[i].
-	// We process definitions in declaration order: each definition can only
-	// reference identifiers that were declared earlier, so substituting
-	// earlier resolved values into the current def's raw regex is enough.
+	// Each definition can only reference identifiers that were declared earlier,
+	// so substituting earlier resolved values into the current def's raw regex is enough.
 	resolved := make([]string, len(f.Definitions))
 	for i, def := range f.Definitions {
 		val := def.Regex
-		for j := 0; j < i; j++ {
+		for j := range i {
 			val = replaceIdent(val, f.Definitions[j].Identifier, "("+resolved[j]+")")
 		}
 		resolved[i] = val
 	}
 
+	// Replace the definitions by their respective patterns
 	result := pattern
 	for i, def := range f.Definitions {
 		result = replaceIdent(result, def.Identifier, "("+resolved[i]+")")
@@ -69,8 +71,44 @@ func (f *YalFile) expandDefinitions(pattern string) string {
 }
 
 // replaceIdent replaces whole-word occurrences of ident in s with repl.
-// Uses \b word boundaries so that e.g. "digit" does not match inside "notdigit".
+// Skips occurrences inside double-quoted strings and only matches when the
+// identifier is not adjacent to a word character on either side. Eg.
+// identifiera != identifier but identifier* or identifier_ does.
 func replaceIdent(s, ident, repl string) string {
-	re := regexp.MustCompile(`\b` + regexp.QuoteMeta(ident) + `\b`)
-	return re.ReplaceAllString(s, repl)
+	var out []byte
+	i := 0
+	for i < len(s) {
+		// Skip double-quoted strings verbatim.
+		if s[i] == '"' {
+			out = append(out, s[i])
+			i++
+			for i < len(s) {
+				out = append(out, s[i])
+				if s[i] == '\\' && i+1 < len(s) {
+					i++
+					out = append(out, s[i])
+				} else if s[i] == '"' {
+					i++
+					break
+				}
+				i++
+			}
+			continue
+		}
+		// Check if ident starts here as a whole word.
+		end := i + len(ident)
+		if end <= len(s) && s[i:end] == ident {
+			isWord := func(c byte) bool {
+				return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+			}
+			if (i == 0 || !isWord(s[i-1])) && (end == len(s) || !isWord(s[end])) {
+				out = append(out, repl...)
+				i = end
+				continue
+			}
+		}
+		out = append(out, s[i])
+		i++
+	}
+	return string(out)
 }

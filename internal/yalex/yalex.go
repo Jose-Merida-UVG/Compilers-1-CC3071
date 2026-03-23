@@ -1,11 +1,18 @@
 package yalex
 
 import (
-	"bufio"
 	"fmt"
-	"os"
 	"strings"
 )
+
+// This module is in charge of parsing and general handling of the
+// YALex spec for lexical analyzer generation. More detail can be
+// found in the documentation, or simply go through the structs and
+// the comments should give a general idea of what a YALex file looks
+// like. Other files in this package include 'scanner.go' which is in
+// charge of the 'dirty work' like removing comments, delimiting sections, etc.
+// and compile.go which is in charge of the 'end-to-end' functionality,
+// providing the struct consumed by the codegen module.
 
 // YalFile is the fully parsed representation of a .yal spec file.
 type YalFile struct {
@@ -34,29 +41,9 @@ type RulePattern struct {
 	Action  string // empty when no action block is present
 }
 
-// ParseYalFile reads a .yal file from disk and returns the parsed structure.
-func ParseYalFile(filename string) (*YalFile, error) {
-	// Open file
-	file, err := os.Open(filename)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open file: %w", err)
-	}
-	defer file.Close()
-
-	// Read & parse lines
-	scanner := bufio.NewScanner(file)
-	var lines []string
-	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
-	}
-	if err = scanner.Err(); err != nil {
-		return nil, fmt.Errorf("error reading file: %w", err)
-	}
-	return parseLines(lines)
-}
-
-// ParseYalContent parses a .yal spec from an in-memory string,
-// this function is only used for internal testing
+// ParseYalContent parses a .yal spec from an in-memory string, the
+// frontend of the app sends a request with file contents so we
+// don't interact directly with the file.
 func ParseYalContent(content string) (*YalFile, error) {
 	return parseLines(strings.Split(content, "\n"))
 }
@@ -99,11 +86,14 @@ func parseSections(lines []string, bounds *sectionBoundaries) (*YalFile, error) 
 
 	// Each non-empty 'let ident = regexp' line in the let section.
 	if bounds.letStart >= 0 && bounds.letEnd > bounds.letStart {
+		// For every line
 		for i := bounds.letStart; i < bounds.letEnd; i++ {
+			// Skip empty or invalid
 			line := strings.TrimSpace(lines[i])
 			if line == "" || !strings.HasPrefix(line, "let ") {
 				continue
 			}
+			// Extract identifier + regexp
 			parts := strings.SplitN(line[4:], "=", 2)
 			if len(parts) == 2 {
 				f.Definitions = append(f.Definitions, LetDefinition{
@@ -114,7 +104,8 @@ func parseSections(lines []string, bounds *sectionBoundaries) (*YalFile, error) 
 		}
 	}
 
-	// Parse rules through rule range found by scanner
+	// Parse rules through rule range found by scanner, returns err on invalid
+	// rule
 	for _, rr := range bounds.ruleRanges {
 		rule, err := parseRule(lines[rr.start:rr.end])
 		if err != nil {
@@ -123,7 +114,7 @@ func parseSections(lines []string, bounds *sectionBoundaries) (*YalFile, error) 
 		f.Rules = append(f.Rules, *rule)
 	}
 
-	// Extrat trailer if well defined bounds
+	// Extract trailer if well defined bounds (if found, basically)
 	if bounds.trailerStart >= 0 && bounds.trailerEnd > bounds.trailerStart {
 		f.Trailer = strings.Join(lines[bounds.trailerStart:bounds.trailerEnd], "\n")
 	}
@@ -134,10 +125,12 @@ func parseSections(lines []string, bounds *sectionBoundaries) (*YalFile, error) 
 // parseRule parses a single rule block. The first line must be `rule name =`;
 // subsequent lines are pattern arms, optionally prefixed with `|`.
 func parseRule(lines []string) (*Rule, error) {
+	// Rules must not be empty
 	if len(lines) == 0 {
 		return nil, fmt.Errorf("empty rule section")
 	}
 
+	// Extract values from 'rule entrypoint [arg1... argn]'
 	rule := &Rule{}
 	firstLine := strings.TrimSpace(lines[0])
 	if !strings.HasPrefix(firstLine, "rule ") {
@@ -152,6 +145,8 @@ func parseRule(lines []string) (*Rule, error) {
 
 	// Each remaining non-empty line is one pattern arm.
 	for i := 1; i < len(lines); i++ {
+		// Lines could have '|' prefix, spec wasn't really specific
+		// with this so we'll let it slide
 		line := strings.TrimSpace(lines[i])
 		if line == "" {
 			continue
@@ -160,6 +155,8 @@ func parseRule(lines []string) (*Rule, error) {
 			line = strings.TrimSpace(line[1:])
 		}
 
+		// Action is whatever's inside the outermost {}, pattern
+		// is the rest of the line
 		pat := RulePattern{}
 		aStart, aEnd := findActionBounds(line)
 		if aStart >= 0 && aEnd > aStart {
@@ -212,10 +209,8 @@ func findActionBounds(line string) (int, int) {
 	return start, end
 }
 
-// validateStructure checks high-level invariants after parsing:
-//   - at least one rule must be present
-//   - every let-def identifier must be a valid ASCII identifier
-//   - every rule must have an entrypoint and at least one pattern
+// validateStructure validates certain structural criteria,
+// basic checks.
 func validateStructure(f *YalFile) error {
 	// Have at least one rule
 	if len(f.Rules) == 0 {

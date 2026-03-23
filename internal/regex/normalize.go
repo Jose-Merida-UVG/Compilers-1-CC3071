@@ -18,20 +18,7 @@ func init() {
 // NormalizePattern converts a raw YALex pattern string into a RegexString whose
 // token slice uses only the defined kinds (Lit, Eps, Star, Plus, Quest, Alt,
 // LParen, RParen). All YALex-specific syntax is fully resolved here so that the
-// rest of the pipeline (HandleSpecialOperators → HandleExplicitConcatenation →
-// ShuntingYard → AppendEndMarker) operates on a clean, quote-free token stream.
-// Recognized syntax:
-//
-//	'c' / '\e'           → Lit(resolved rune)
-//	"str\n..."           → one Lit token per resolved char
-//	['c1'-'c2']          → LP Lit… Alt… Lit RP  (range inclusive)
-//	['c' 'c' …]          → LP Lit… Alt… Lit RP  (list)
-//	["abc"]              → LP Lit(a) Alt Lit(b) Alt Lit(c) RP
-//	[^set]               → all printable ASCII minus set
-//	[set1] # [set2]      → set difference (set1 − set2), highest precedence
-//	_                    → any printable ASCII character
-//	eof                  → Lit(0)  — null sentinel for end-of-buffer
-//	( ) * + ? |          → their respective operator tokens
+// rest of the pipeline operates on a clean regex.
 func NormalizePattern(pattern string) (*RegexString, error) {
 	p := &patParser{runes: []rune(pattern)}
 	tokens, err := p.scanAll()
@@ -41,26 +28,34 @@ func NormalizePattern(pattern string) (*RegexString, error) {
 	return &RegexString{Chars: tokens}, nil
 }
 
+// Parser tracks all chars (runes) + current position
 type patParser struct {
 	runes []rune
 	pos   int
 }
 
+// eof when already gone through all chars
 func (p *patParser) eof() bool { return p.pos >= len(p.runes) }
 
+// peek gets next rune w/o consuming it
 func (p *patParser) peek() rune {
 	if p.eof() {
 		return 0
 	}
 	return p.runes[p.pos]
 }
+
+// next consumes next rune
 func (p *patParser) next() rune { ch := p.runes[p.pos]; p.pos++; return ch }
+
+// skipWS skips whitespace
 func (p *patParser) skipWS() {
 	for !p.eof() && (p.peek() == ' ' || p.peek() == '\t') {
 		p.pos++
 	}
 }
 
+// scanAll is the main loop, iterate through runes -> append output into Token
 func (p *patParser) scanAll() ([]Token, error) {
 	var out []Token
 	for {
@@ -68,6 +63,7 @@ func (p *patParser) scanAll() ([]Token, error) {
 		if p.eof() {
 			break
 		}
+		// This function branches off into different ones
 		toks, err := p.scanOne()
 		if err != nil {
 			return nil, err
@@ -77,8 +73,13 @@ func (p *patParser) scanAll() ([]Token, error) {
 	return out, nil
 }
 
+// scanOne is the main function called on every iteration, we peek
+// to see next char then branch off depending on what this character is.
+// Here's where we call the auxiliary functions like reading literals or
+// character classes.
 func (p *patParser) scanOne() ([]Token, error) {
 	switch p.peek() {
+	// Read literal 'c'
 	case '\'':
 		r, err := p.readCharLit()
 		if err != nil {
@@ -86,16 +87,22 @@ func (p *patParser) scanOne() ([]Token, error) {
 		}
 		return []Token{litToken(r)}, nil
 
+	// Read string literal "string-literal"
 	case '"':
 		return p.readStringLit()
 
-	case '[': // char class [set] or negated [^set], possibly followed by #
+	// Read [set] or [^set], can also be followed by # for [setA] # [setB]
+	case '[':
 		return p.readCharClass()
 
-	case '_': // wildcard — any printable ASCII character
+	// Wildcard - any printable ASCII (our alphabet)
+	case '_':
 		p.next()
 		return runeSetToTokens(printableASCII), nil
 
+	// Reading operators, since we've already exhausted the 'special cases' where
+	// we could be inside of string or rune literals / character classes we can
+	// go ahead and just create these tokens on a switch case
 	case '(':
 		p.next()
 		return []Token{{Kind: LParen, Value: '('}}, nil
@@ -115,6 +122,8 @@ func (p *patParser) scanOne() ([]Token, error) {
 		p.next()
 		return []Token{{Kind: Alt, Value: '|'}}, nil
 
+	// Anything that isn't one of the cases above MUST be eof or
+	// an error.
 	default:
 		ch := p.peek()
 		if isIdentStart(ch) {
@@ -122,6 +131,7 @@ func (p *patParser) scanOne() ([]Token, error) {
 			switch id {
 			case "eof":
 				return []Token{litToken(RuneEOF)}, nil
+			//
 			default:
 				return nil, fmt.Errorf("unknown identifier %q — let-defs must be expanded before normalization", id)
 			}
@@ -130,17 +140,21 @@ func (p *patParser) scanOne() ([]Token, error) {
 	}
 }
 
-// readCharLit parses 'c' or '\e' (positioned at opening ') and returns the rune.
+// readCharLit parses 'c' or '\t' (positioned at opening ') and returns the rune.
 func (p *patParser) readCharLit() (rune, error) {
-	p.next() // consume opening '
+	// Consume the opening '
+	p.next()
+	// Read the body
 	r, err := p.readCharBody()
 	if err != nil {
 		return 0, err
 	}
+	// Check for closing '
 	if p.eof() || p.peek() != '\'' {
 		return 0, fmt.Errorf("missing closing ' in char literal")
 	}
-	p.next() // consume closing '
+	// Consume closing '
+	p.next()
 	return r, nil
 }
 
@@ -149,6 +163,7 @@ func (p *patParser) readCharBody() (rune, error) {
 	if p.eof() {
 		return 0, fmt.Errorf("unexpected end of input inside literal")
 	}
+	// Return the char if not an escape sequence
 	ch := p.next()
 	if ch != '\\' {
 		return ch, nil
@@ -156,12 +171,13 @@ func (p *patParser) readCharBody() (rune, error) {
 	return p.readEscape()
 }
 
-// readEscape resolves the character after a backslash.
-// Only the six sequences defined in the spec are valid.
+// readEscape resolves the character after a backslash, only the six sequences
+// defined in the spec are valid.
 func (p *patParser) readEscape() (rune, error) {
 	if p.eof() {
 		return 0, fmt.Errorf("backslash at end of pattern")
 	}
+	// The 6 defined sequences
 	ch := p.next()
 	switch ch {
 	case 'n':
@@ -183,20 +199,25 @@ func (p *patParser) readEscape() (rune, error) {
 
 // readStringLit parses "str" and emits one Lit token per resolved char.
 func (p *patParser) readStringLit() ([]Token, error) {
-	p.next() // consume opening "
+	// Consume opening "
+	p.next()
 	var toks []Token
+	// Iterate through string literal
 	for {
 		if p.eof() {
 			return nil, fmt.Errorf("unclosed string literal")
 		}
+		// Break once closing " is found
 		if p.peek() == '"' {
-			p.next() // consume closing "
+			p.next()
 			break
 		}
+		// Read char / escape sequence
 		r, err := p.readCharBody()
 		if err != nil {
 			return nil, err
 		}
+		// Append read char / escape sequence
 		toks = append(toks, litToken(r))
 	}
 	if len(toks) == 0 {
@@ -206,15 +227,16 @@ func (p *patParser) readStringLit() ([]Token, error) {
 }
 
 // readCharClass parses [set] or [^set], then handles the optional # [set]
-// set-difference operator (highest precedence per the spec), and finally emits
-// LP Lit… Alt… Lit RP for the resolved rune set.
+// set-difference operator and emits (a|b|c|...) for the resolved rune set.
 func (p *patParser) readCharClass() ([]Token, error) {
-	p.next() // consume [
+	// Consume opening [
+	p.next()
+	// Check negation
 	negated := !p.eof() && p.peek() == '^'
 	if negated {
 		p.next()
 	}
-
+	// Get raw contents
 	rawSet, err := p.readCharSetContent()
 	if err != nil {
 		return nil, err
@@ -222,9 +244,10 @@ func (p *patParser) readCharClass() ([]Token, error) {
 	if p.eof() || p.peek() != ']' {
 		return nil, fmt.Errorf("missing ] in char class")
 	}
-	p.next() // consume ]
+	// Consume closing ]
+	p.next()
 
-	// Apply negation: all printable ASCII minus the explicit set.
+	// If negated, its alphabet - set
 	set := rawSet
 	if negated {
 		set = runeSetDiff(printableASCII, toRuneSet(rawSet))
@@ -235,16 +258,17 @@ func (p *patParser) readCharClass() ([]Token, error) {
 	// char classes. We handle it immediately after parsing the left class.
 	p.skipWS()
 	if !p.eof() && p.peek() == '#' {
-		p.next() // consume #
+		// Consume #
+		p.next()
 		p.skipWS()
 		if p.eof() || p.peek() != '[' {
 			return nil, fmt.Errorf("'#' must be followed by a char class [...]")
 		}
-		rhsToks, err := p.readCharClass() // recursive: handles negation/# on the right too
+		rhsToks, err := p.readCharClass() // recursively handles negation/# on the right too
 		if err != nil {
 			return nil, err
 		}
-		// Collect the rune set from the already-expanded LP Lit Alt … RP sequence.
+		// Collect the rune set from the already-expanded sequence.
 		rhsSet := map[rune]bool{}
 		for _, t := range rhsToks {
 			if t.Kind == Lit {

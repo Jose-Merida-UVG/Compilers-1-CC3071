@@ -1,21 +1,36 @@
 package main
 
-func add(x, y) {
+import "fmt"
+
+func add(x, y int) {
 	return x + y
 }
 
 func main() {
 	var n = 10
 	const limit = 0xFF
+	var big = 0XA3
 
 	for i := 0; i < n; i++ {
 		n *= 2
 	}
 
-	if n > limit {
+	if n != limit && n >= 0 || n <= 100 {
 		n--
 	}
 
-	10abc
+	x := true
+	y := false
+	z := nil
+
+	type Point struct {
+		x, y int
+	}
+
+	ch <- n
+
 	forloop
+	10abc
+	3.14.15
+	@@@
 }

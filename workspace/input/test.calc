@@ -1,10 +1,16 @@
 let x = 0xFF
 let y = 3.14
-
 if x > 0 else y <= 10.0
 x += 2
+x -= 1
+x *= 3
+x /= 2
+x ** 2
 a && b || !a
-
+a != b
+a >= b
+a == b
 iffy
 if
 0x
+@@@

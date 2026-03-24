@@ -62,7 +62,7 @@ func computeAttributes(node *ds.Node[regex.ASTNodeData], table *DirectTable) {
 		}
 		return
 
-	// Handle OR
+		// Handle OR
 	} else if node.Value.Value == '|' {
 		// Nullable = Nullable(L) || Nullable(R)
 		node.Value.Nullable = node.Left.Value.Nullable || node.Right.Value.Nullable
@@ -218,7 +218,7 @@ func (table *DirectTable) ToDFA() *DFA {
 				}
 			}
 			if len(newSetMap) == 0 {
-				// No positions match this symbol — no transition.
+				// No positions match this symbol
 				continue
 			}
 			// Flatten the set map into a slice for key computation.

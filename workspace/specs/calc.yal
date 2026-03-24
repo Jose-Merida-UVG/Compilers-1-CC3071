@@ -1,4 +1,4 @@
-(* Expression calculator with hex literals, comparison and logic ops *)
+(* calc lexer - hex, comparison, logic, compound assignment *)
 {
     const (
         FLOAT  = 1
@@ -44,7 +44,6 @@ let int    = digit+
 let float  = digit+ '.' digit+
 let hex    = '0' ('x' | 'X') hexdig+
 let ident  = alpha alnum*
-let symbol = _ # ['a'-'z' 'A'-'Z' '0'-'9' '_' ' ' '\t' '\n' '\r']
 let pow    = "**"
 let pleq   = "+="
 let mieq   = "-="

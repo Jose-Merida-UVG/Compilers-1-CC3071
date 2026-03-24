@@ -53,7 +53,7 @@ func Merge(dfas []*DFA) *DFA {
 		}
 	}
 
-	// Union of all alphabets — the merged DFA must handle every symbol any
+	// Union of all alphabets, the merged DFA must handle every symbol any
 	// individual DFA could ever see.
 	alphaSet := make(map[rune]bool)
 	for _, dfa := range dfas {
@@ -85,7 +85,7 @@ func Merge(dfas []*DFA) *DFA {
 	// tokenOf scans the multiState left-to-right and returns the 1-based token
 	// ID of the first accepting component. Left-to-right order is pattern order,
 	// so the earliest pattern in the .yal file wins when multiple DFAs accept
-	// the same string .Returns 0 if no component is currently in an accepting state.
+	// the same string. Returns 0 if no component is currently in an accepting state.
 	tokenOf := func(ms multiState) int {
 		for i, id := range ms {
 			if id == -1 {
@@ -161,7 +161,6 @@ func Merge(dfas []*DFA) *DFA {
 		}
 	}
 
-	// Minimize the merged DFA — parallel simulation can leave many equivalent
-	// states that Hopcroft will collapse, keeping the final automaton small.
+	// Minimize the merged DFA
 	return NewDFA(startState).Minimize()
 }

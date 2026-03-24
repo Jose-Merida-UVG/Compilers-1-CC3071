@@ -1,4 +1,4 @@
-(* Arithmetic expression lexer *)
+(* arithmetic lexer *)
 {
     const (
         FLOAT  = 1

@@ -131,7 +131,6 @@ func (p *patParser) scanOne() ([]Token, error) {
 			switch id {
 			case "eof":
 				return []Token{litToken(RuneEOF)}, nil
-			//
 			default:
 				return nil, fmt.Errorf("unknown identifier %q — let-defs must be expanded before normalization", id)
 			}

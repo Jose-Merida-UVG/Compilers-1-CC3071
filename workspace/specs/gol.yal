@@ -77,7 +77,7 @@ let mieq    = "-="
 let tieq    = "*="
 let dieq    = "/="
 let inc     = "++"
-let dec     = "--"
+let dec     = "--" - -
 let eq      = "=="
 let neq     = "!="
 let leq     = "<="

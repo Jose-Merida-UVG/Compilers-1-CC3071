@@ -31,6 +31,7 @@
         KWIF   = 28
         KWELSE = 29
         IDENT  = 30
+        WHILE = 31
     )
 }
 
@@ -56,9 +57,11 @@ let geq    = ">="
 let and    = "&&"
 let or     = "||"
 let ws     = [' ' '\t' '\n' '\r']
+let while = "while"
 
 rule gettoken =
   ws+    {  }
+| whileee { fmt.Print("WHILE  "); return WHILE}
 | float  { fmt.Print("FLOAT  "); return FLOAT }
 | hex    { fmt.Print("HEX    "); return HEX }
 | int    { fmt.Print("INT    "); return INT }

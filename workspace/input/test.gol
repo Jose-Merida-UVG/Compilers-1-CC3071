@@ -1,6 +1,6 @@
 package main
 
-import "fmt"
+import fmt
 
 func add(x, y int) {
 	return x + y
@@ -32,5 +32,4 @@ func main() {
 	forloop
 	10abc
 	3.14.15
-	@@@
 }

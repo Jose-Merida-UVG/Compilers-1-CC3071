@@ -53,6 +53,26 @@ export interface LexerOutput {
   error?: string;
 }
 
+export interface ParserTokenDef {
+  name: string;
+  id: number;
+}
+
+export interface ParserProduction {
+  name: string;
+  rules: string[][];
+}
+
+export interface ParserBuildResult {
+  tokens: ParserTokenDef[];
+  productions: ParserProduction[];
+  ignoreList: string[];
+}
+
+export interface RunOutput {
+  lines: string[];
+}
+
 export interface EditorTab {
   path: string;
   label: string;

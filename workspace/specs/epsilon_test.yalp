@@ -1,0 +1,65 @@
+/* Grammar with multiple epsilon productions — tests nullable propagation.
+
+   Original (textbook notation):
+     S → a B D h
+     B → c C
+     C → b C | ε
+     D → E F
+     E → g | ε
+     F → f | ε
+
+   In .yalp: non-terminals are lowercase, terminals are UPPERCASE.
+   Epsilon is written as an empty alternative: | /* empty */
+
+   Expected FIRST sets:
+     FIRST(s)    = { A }
+     FIRST(bprod) = { C }
+     FIRST(cprod) = { B, ε }
+     FIRST(dprod) = { G, F, ε }
+     FIRST(eprod) = { G, ε }
+     FIRST(fprod) = { F, ε }
+
+   Expected FOLLOW sets:
+     FOLLOW(s)    = { $ }
+     FOLLOW(bprod) = { G, F, H }
+     FOLLOW(cprod) = { G, F, H }
+     FOLLOW(dprod) = { H }
+     FOLLOW(eprod) = { F, H }
+     FOLLOW(fprod) = { H }
+*/
+
+%token A
+%token B
+%token C
+%token F
+%token G
+%token H
+
+%%
+
+s:
+    A bprod dprod H
+;
+
+bprod:
+    C cprod
+;
+
+cprod:
+    B cprod
+  | /* empty */
+;
+
+dprod:
+    eprod fprod
+;
+
+eprod:
+    G
+  | /* empty */
+;
+
+fprod:
+    F
+  | /* empty */
+;

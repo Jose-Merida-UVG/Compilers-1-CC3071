@@ -1,4 +1,4 @@
-import type { FileNode, DFAGraphData, LexerOutput } from "../types";
+import type { FileNode, DFAGraphData, LexerOutput, ParserBuildResult, RunOutput } from "../types";
 
 const BASE = "/api";
 
@@ -49,4 +49,10 @@ export const api = {
 
   runLexer: (inputPath: string) =>
     req<LexerOutput>("/lexer", json({ inputPath })),
+
+  buildParser: (yalpPath: string) =>
+    req<{ summary: string[] }>("/yapar", json({ yalpPath })),
+
+  run: (inputPath: string) =>
+    req<RunOutput>("/run", json({ inputPath })),
 };

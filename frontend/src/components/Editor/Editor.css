@@ -137,6 +137,15 @@
   background: rgba(16, 217, 160, 0.22);
   border-color: rgba(16, 217, 160, 0.45);
 }
+.toolbar-pill--parser {
+  color: #c4b5fd;
+  background: rgba(139, 92, 246, 0.12);
+  border-color: rgba(139, 92, 246, 0.25);
+}
+.toolbar-pill--parser:hover {
+  background: rgba(139, 92, 246, 0.22);
+  border-color: rgba(139, 92, 246, 0.45);
+}
 
 /* ── Editor body ─────────────────────────────────────────────────────────── */
 .editor-body {

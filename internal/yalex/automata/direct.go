@@ -5,7 +5,7 @@ import (
 	"slices"
 
 	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/ds"
-	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/regex"
+	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/yalex/regex"
 )
 
 // DirectTable holds the followpos data computed from the augmented regex AST.

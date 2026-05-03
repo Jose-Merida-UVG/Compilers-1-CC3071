@@ -50,6 +50,70 @@ export function registerOutLanguage(monaco: typeof Monaco) {
   });
 }
 
+export function registerYALPLanguage(monaco: typeof Monaco) {
+  if (monaco.languages.getLanguages().some((l) => l.id === "yapar")) return;
+
+  monaco.languages.register({ id: "yapar", extensions: [".yalp"] });
+
+  monaco.languages.setMonarchTokensProvider("yapar", {
+    tokenizer: {
+      root: [
+        // Block comments /* ... */
+        [/\/\*/, "comment", "@comment"],
+        // %token directive
+        [/%token/, "keyword"],
+        // IGNORE keyword
+        [/\bIGNORE\b/, "keyword"],
+        // %% separator
+        [/%%/, "operator"],
+        // Token names (UPPERCASE)
+        [/\b[A-Z][A-Z0-9_]*\b/, "type"],
+        // Non-terminal names (lowercase)
+        [/\b[a-z][a-z0-9_]*\b/, "identifier"],
+        // Production punctuation
+        [/[:|;]/, "operator"],
+        // Pipe (alternate)
+        [/\|/, "operator"],
+        [/\s+/, "white"],
+      ],
+      comment: [
+        [/\*\//, "comment", "@pop"],
+        [/[^*/]+/, "comment"],
+        [/[*/]/, "comment"],
+      ],
+    },
+  });
+
+  monaco.languages.setLanguageConfiguration("yapar", {
+    comments: { blockComment: ["/*", "*/"] },
+    brackets: [["(", ")"]],
+  });
+
+  monaco.editor.defineTheme("yapar-dark", {
+    base: "vs-dark",
+    inherit: true,
+    rules: [
+      { token: "keyword",    foreground: "c792ea", fontStyle: "bold" },
+      { token: "comment",    foreground: "546e7a", fontStyle: "italic" },
+      { token: "type",       foreground: "f78c6c", fontStyle: "bold" }, // token names
+      { token: "operator",   foreground: "89ddff" },
+      { token: "identifier", foreground: "82aaff" },                    // non-terminals
+    ],
+    colors: {
+      "editor.background":           "#14141a",
+      "editor.foreground":           "#e2e2e6",
+      "editorLineNumber.foreground": "#3a3a4a",
+      "editorLineNumber.activeForeground": "#7c6af7",
+      "editor.lineHighlightBackground": "#1c1c26",
+      "editorCursor.foreground":     "#8b5cf6",
+      "editor.selectionBackground":  "#3b3170",
+      "editor.inactiveSelectionBackground": "#2a2550",
+      "editorIndentGuide.background1": "#2a2a36",
+      "editorIndentGuide.activeBackground1": "#8b5cf6",
+    },
+  });
+}
+
 export function registerYALLanguage(monaco: typeof Monaco) {
   if (monaco.languages.getLanguages().some((l) => l.id === "yalex")) return;
 

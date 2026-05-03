@@ -153,7 +153,18 @@ export default function App() {
     }
   }, [appendTerminal, refreshTree]);
 
-  // ── Lexer ────────────────────────────────────────────────────────────────────
+  // ── Parser build ──────────────────────────────────────────────────────────────
+  const buildParser = useCallback(async (yalpPath: string) => {
+    appendTerminal(`\nBuilding grammar from ${yalpPath}…`);
+    try {
+      const result = await api.buildParser(yalpPath);
+      (result.summary ?? []).forEach((line: string) => appendTerminal(line));
+    } catch (e: any) {
+      appendTerminal(`Parser error: ${e.message}`);
+    }
+  }, [appendTerminal]);
+
+  // ── Run (parser-aware) ────────────────────────────────────────────────────────
   const runFile = useCallback(async (inputPath: string) => {
     const tab = tabs.find((t) => t.path === inputPath);
     if (tab?.isDirty) {
@@ -167,9 +178,9 @@ export default function App() {
     }
 
     const ext = inputPath.split(".").pop() ?? "";
-    appendTerminal(`\n▶ Running ${inputPath} → specs/${ext}.yal`);
+    appendTerminal(`\n▶ Running ${inputPath} (spec: ${ext})`);
     try {
-      const result = await api.runLexer(inputPath);
+      const result = await api.run(inputPath);
       (result.lines ?? []).forEach((l) => appendTerminal(l));
       appendTerminal(`── output saved to output/${inputPath.split("/").pop()}.out ──`);
       refreshTree();
@@ -179,7 +190,8 @@ export default function App() {
   }, [tabs, appendTerminal, refreshTree]);
 
   const activeTabData = tabs.find((t) => t.path === activeTab) ?? null;
-  const isYAL = activeTab?.endsWith(".yal") ?? false;
+  const isYAL  = activeTab?.endsWith(".yal") ?? false;
+  const isYALP = activeTab?.endsWith(".yalp") ?? false;
   const isInput = activeTab?.startsWith("input/") ?? false;
 
   return (
@@ -204,6 +216,7 @@ export default function App() {
           onChangeContent={updateTabContent}
           onSave={saveTab}
           onBuildDFA={isYAL ? buildDFA : undefined}
+          onBuildParser={isYALP ? buildParser : undefined}
           onRunFile={isInput ? runFile : undefined}
         />
         <div className="resize-handle" onMouseDown={onResizeStart} />

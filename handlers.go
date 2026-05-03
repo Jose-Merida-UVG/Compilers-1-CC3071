@@ -9,9 +9,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/codegen"
-	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/graph"
+	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/yalex/codegen"
+	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/yalex/graph"
 	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/yalex"
+	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/yapar"
+	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/yapar/grammar"
 )
 
 
@@ -32,6 +34,8 @@ func registerHandlers(mux *http.ServeMux, workspace string) {
 	mux.HandleFunc("PUT /api/directory", h.createDirectory)
 	mux.HandleFunc("POST /api/dfa", h.getDFA)
 	mux.HandleFunc("POST /api/lexer", h.runLexer)
+	mux.HandleFunc("POST /api/yapar", h.buildParser)
+	mux.HandleFunc("POST /api/run", h.runFile)
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -308,6 +312,99 @@ func (h *apiHandler) runLexer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	out, err := exec.Command("go", "run", lexerFile, inputFull).Output()
+	if err != nil {
+		if ee, ok := err.(*exec.ExitError); ok {
+			writeError(w, http.StatusUnprocessableEntity, string(ee.Stderr))
+		} else {
+			writeError(w, http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
+
+	lines := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
+
+	os.MkdirAll(filepath.Join(h.workspace, "output"), 0o755)
+	os.WriteFile(filepath.Join(h.workspace, "output", base+".out"), out, 0o644)
+
+	writeJSON(w, map[string]any{"lines": lines})
+}
+
+// ─── YAPar handlers ──────────────────────────────────────────────────────────
+
+func (h *apiHandler) buildParser(w http.ResponseWriter, r *http.Request) {
+	body, err := decode[struct {
+		YalpPath string `json:"yalpPath"`
+	}](r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	yalpFull, err := h.resolve(body.YalpPath)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	yalpContent, err := os.ReadFile(yalpFull)
+	if err != nil {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("cannot read %s: %v", body.YalpPath, err))
+		return
+	}
+
+	yalpFile, err := yapar.ParseYalpContent(string(yalpContent))
+	if err != nil {
+		writeError(w, http.StatusUnprocessableEntity, fmt.Sprintf("yapar: %v", err))
+		return
+	}
+
+	specBase := strings.TrimSuffix(filepath.Base(body.YalpPath), ".yalp")
+	g := grammar.Build(specBase, yalpFile)
+
+	writeJSON(w, map[string]any{
+		"summary": g.Summary(),
+	})
+}
+
+// runFile serves POST /api/run. It prefers a generated parser over a standalone
+// lexer when both exist for the same spec name (inferred from the input extension).
+func (h *apiHandler) runFile(w http.ResponseWriter, r *http.Request) {
+	body, err := decode[struct {
+		InputPath string `json:"inputPath"`
+	}](r)
+	if err != nil || body.InputPath == "" {
+		writeError(w, http.StatusBadRequest, "inputPath required")
+		return
+	}
+
+	inputFull, err := h.resolve(body.InputPath)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	base := filepath.Base(body.InputPath)
+	ext := strings.TrimPrefix(filepath.Ext(base), ".")
+	if ext == "" {
+		writeError(w, http.StatusBadRequest, "cannot infer spec: file has no extension")
+		return
+	}
+
+	// Prefer parser over standalone lexer.
+	parserFile := filepath.Join(h.workspace, "parsers", ext+".go")
+	lexerFile := filepath.Join(h.workspace, "lexers", ext+".go")
+
+	var runFile string
+	if _, err := os.Stat(parserFile); err == nil {
+		runFile = parserFile
+	} else if _, err := os.Stat(lexerFile); err == nil {
+		runFile = lexerFile
+	} else {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("no parser or lexer found for .%s — build one first", ext))
+		return
+	}
+
+	out, err := exec.Command("go", "run", runFile, inputFull).Output()
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
 			writeError(w, http.StatusUnprocessableEntity, string(ee.Stderr))

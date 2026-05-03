@@ -10,9 +10,18 @@ import (
 func main() {
 	// Workspace is the directory the server reads/writes user files from.
 	workspace := filepath.Join(".", "workspace")
-	if err := os.MkdirAll(workspace, 0o755); err != nil {
-		fmt.Fprintf(os.Stderr, "cannot create workspace: %v\n", err)
-		os.Exit(1)
+	for _, dir := range []string{
+		workspace,
+		filepath.Join(workspace, "specs"),
+		filepath.Join(workspace, "lexers"),
+		filepath.Join(workspace, "parsers"),
+		filepath.Join(workspace, "input"),
+		filepath.Join(workspace, "output"),
+	} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			fmt.Fprintf(os.Stderr, "cannot create workspace dir %s: %v\n", dir, err)
+			os.Exit(1)
+		}
 	}
 
 	mux := http.NewServeMux()

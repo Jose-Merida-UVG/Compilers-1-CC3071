@@ -1,7 +1,7 @@
 import MonacoEditor from "@monaco-editor/react";
 import type * as Monaco from "monaco-editor";
 import type { EditorTab } from "../../types";
-import { registerYALLanguage, registerOutLanguage } from "../../lib/monaco-yal";
+import { registerYALLanguage, registerOutLanguage, registerYALPLanguage } from "../../lib/monaco-yal";
 import DFAViewer from "../DFAViewer/DFAViewer";
 import MarkdownViewer from "../MarkdownViewer/MarkdownViewer";
 import "./Editor.css";
@@ -14,20 +14,23 @@ interface Props {
   onChangeContent: (p: string, c: string) => void;
   onSave: (p: string) => void;
   onBuildDFA?: (p: string) => void;
+  onBuildParser?: (p: string) => void;
   onRunFile?: (p: string) => void;
 }
 
 export default function EditorPane({
-  tabs, activeTab, onSelectTab, onCloseTab, onChangeContent, onSave, onBuildDFA, onRunFile,
+  tabs, activeTab, onSelectTab, onCloseTab, onChangeContent, onSave, onBuildDFA, onBuildParser, onRunFile,
 }: Props) {
   const active = tabs.find((t) => t.path === activeTab) ?? null;
-  const isYAL = activeTab?.endsWith(".yal") ?? false;
+  const isYAL  = activeTab?.endsWith(".yal") ?? false;
+  const isYALP = activeTab?.endsWith(".yalp") ?? false;
   const isInput = !!onRunFile;
   const isDFATab = !!(active?.dfaData);
   const isMarkdown = activeTab?.endsWith(".md") ?? false;
 
   const handleBeforeMount = (monaco: typeof Monaco) => {
     registerYALLanguage(monaco);
+    registerYALPLanguage(monaco);
     registerOutLanguage(monaco);
   };
 
@@ -66,7 +69,12 @@ export default function EditorPane({
           <div className="editor-toolbar__actions">
             {isYAL && (
               <button className="toolbar-pill" onClick={() => onBuildDFA?.(activeTab!)}>
-                ◎ Build
+                ◎ Build Lexer
+              </button>
+            )}
+            {isYALP && (
+              <button className="toolbar-pill toolbar-pill--parser" onClick={() => onBuildParser?.(activeTab!)}>
+                ◎ Build Parser
               </button>
             )}
             {isInput && (
@@ -89,7 +97,11 @@ export default function EditorPane({
             <MonacoEditor
               height="100%"
               language={getLanguage(active.path)}
-              theme={active.path.endsWith(".out") ? "yalex-dark-out" : "yalex-dark"}
+              theme={
+            active.path.endsWith(".out")  ? "yalex-dark-out" :
+            active.path.endsWith(".yalp") ? "yapar-dark" :
+            "yalex-dark"
+          }
               value={active.content}
               beforeMount={handleBeforeMount}
               onChange={(val) => { if (val !== undefined) onChangeContent(active.path, val); }}
@@ -149,6 +161,7 @@ function Hint({ keys, label }: { keys: string[]; label: string }) {
 
 function getLanguage(path: string): string {
   if (path.endsWith(".yal"))  return "yalex";
+  if (path.endsWith(".yalp")) return "yapar";
   if (path.endsWith(".out"))  return "lexout";
   if (path.endsWith(".go"))   return "go";
   if (path.endsWith(".json")) return "json";

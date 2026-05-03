@@ -3,8 +3,8 @@ package yalex
 import (
 	"fmt"
 
-	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/automata"
-	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/regex"
+	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/yalex/automata"
+	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/yalex/regex"
 )
 
 // CompiledLexer is the result of compiling a YalFile, a single minimized DFA

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/automata"
+	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/yalex/automata"
 )
 
 // SerializeDFA converts a DFA into the JSON-serialisable form consumed by the frontend.

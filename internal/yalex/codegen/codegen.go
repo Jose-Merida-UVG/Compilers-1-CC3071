@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/automata"
+	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/yalex/automata"
 	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/yalex"
 )
 

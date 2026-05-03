@@ -2,9 +2,128 @@
 
 Proyecto de CC3071 - Diseño de Lenguajes de Programación, Universidad del Valle de Guatemala.
 
-El sistema tiene dos componentes principales:
-- **YALex** — genera un analizador léxico (lexer) a partir de un archivo `.yal`
-- **YAPar** — construye y analiza la gramática de un parser a partir de un archivo `.yalp`
+---
+
+## Para el equipo — FIRST y FOLLOW
+
+Todo el trabajo vive en:
+
+```
+internal/yapar/grammar/
+  grammar.go   ← struct Grammar, Build(), Summary() y helpers
+  first.go     ← ComputeFirst()   ← implementar acá
+  follow.go    ← ComputeFollow()  ← implementar acá
+```
+
+Implementás `ComputeFirst()` y `ComputeFollow()`, llenás `g.First` y `g.Follow`, y los resultados aparecen automáticamente en la terminal de la UI al hacer click en **◎ Build Parser**. No hay que tocar nada más.
+
+### El struct Grammar
+
+```go
+type Grammar struct {
+    Name         string
+    StartSymbol  string
+    Terminals    map[string]int   // nombre → token ID
+    NonTerminals map[string]bool  // conjunto de no terminales
+    Productions  []Production     // todas las reglas, una por alternativa
+    IgnoreList   []string
+
+    First  map[string]map[string]bool  // llenar en ComputeFirst
+    Follow map[string]map[string]bool  // llenar en ComputeFollow
+}
+```
+
+### Convenciones
+
+| Concepto | Cómo representarlo |
+|---|---|
+| ε en FIRST | `g.First["X"][grammar.Epsilon] = true` |
+| Símbolo nullable | `sym.Nullable = true` + la línea de arriba |
+| Fin de input en FOLLOW | usar el string `"$"` como clave |
+| Producción ε | `len(production.Body) == 0` |
+
+### Helpers disponibles
+
+```go
+g.ProductionsFor("expr")  // todas las producciones con ese head
+g.IsTerminal("PLUS")      // true si es token declarado
+g.IsNonTerminal("expr")   // true si es cabeza de producción
+g.IsNullable("expr")      // true si ε ∈ FIRST(expr), válido post-ComputeFirst
+```
+
+### Flujo de comunicación con la UI
+
+```
+Click "Build Parser"
+         ↓
+POST /api/yapar { yalpPath }
+         ↓
+ParseYalpContent() → grammar.Build() → g.Summary()
+         ↓
+{ summary: []string }
+         ↓
+cada string = una línea en la terminal de la UI
+```
+
+Si querés agregar output extra al terminal, agregá líneas en `Summary()`:
+
+```go
+lines = append(lines, "── Mi sección ──")
+lines = append(lines, fmt.Sprintf("  resultado: %v", valor))
+```
+
+---
+
+## Gramáticas de ejemplo
+
+En `workspace/specs/` hay dos gramáticas listas — abrí cualquiera en la UI y hacé click en **◎ Build Parser** para ver el output.
+
+### `dragon.yalp` — Dragon Book §4.5
+
+```
+e → e PLUS t | t
+t → t TIMES f | f
+f → LPAREN e RPAREN | ID
+```
+
+Output esperado:
+```
+FIRST(e) = { ID, LPAREN }
+FIRST(t) = { ID, LPAREN }
+FIRST(f) = { ID, LPAREN }
+
+FOLLOW(e) = { $, PLUS, RPAREN }
+FOLLOW(t) = { $, PLUS, TIMES, RPAREN }
+FOLLOW(f) = { $, PLUS, TIMES, RPAREN }
+```
+
+### `epsilon_test.yalp` — Gramática con múltiples ε
+
+```
+S → a B D h
+B → c C
+C → b C | ε
+D → E F
+E → g | ε
+F → f | ε
+```
+
+Output esperado:
+```
+FIRST(s)     = { A }
+FIRST(bprod) = { C }
+FIRST(cprod) = { B, ε }
+FIRST(dprod) = { G, F, ε }
+FIRST(eprod) = { G, ε }
+FIRST(fprod) = { F, ε }
+
+FOLLOW(s)     = { $ }
+FOLLOW(bprod) = { G, F, H }
+FOLLOW(cprod) = { G, F, H }
+FOLLOW(dprod) = { H }
+FOLLOW(eprod) = { F, H }
+FOLLOW(fprod) = { H }
+```
 
 ---
 
@@ -33,16 +152,14 @@ make dev
 
 Abrí el navegador en **http://localhost:5173**.
 
-Para hacer un build de producción (genera binario + frontend compilado):
+Para build de producción:
 
 ```bash
 make build
 ./yalex
 ```
 
-El binario sirve el frontend directamente en `http://localhost:8080`.
-
-Para limpiar artefactos generados:
+Para limpiar artefactos:
 
 ```bash
 make clean
@@ -70,8 +187,6 @@ Abrí el navegador en **http://localhost:5173**.
 
 ## Estructura del workspace
 
-Todos los archivos de trabajo del usuario viven en `workspace/`:
-
 ```
 workspace/
   specs/    ← tus archivos .yal y .yalp van acá
@@ -85,17 +200,15 @@ workspace/
 
 ## Usar el Lexer (YALex)
 
-1. Creá un archivo `.yal` en `workspace/specs/` desde el explorador de archivos de la UI
+1. Creá un archivo `.yal` en `workspace/specs/`
 2. Escribí tu especificación léxica en el editor
 3. Hacé click en **◎ Build Lexer** — genera el DFA y el lexer en `lexers/`
 4. Creá un archivo de prueba en `workspace/input/` con extensión igual al nombre de tu spec (ej. `test.arithmetic` para `arithmetic.yal`)
-5. Abrí el archivo de prueba y hacé click en **▶ Run** — el output aparece en la terminal de la UI
+5. Abrí el archivo de prueba y hacé click en **▶ Run**
 
 ---
 
 ## Usar el Parser (YAPar)
-
-### Archivos necesarios
 
 Cada parser necesita un par de archivos con el **mismo nombre base**:
 
@@ -104,15 +217,15 @@ Cada parser necesita un par de archivos con el **mismo nombre base**:
 | `specs/nombre.yal` | Especificación léxica (patrones y acciones) |
 | `specs/nombre.yalp` | Especificación de la gramática (tokens y producciones) |
 
-### Estructura de un archivo `.yalp`
+### Formato de un archivo `.yalp`
 
 ```
-/* comentario estilo C */
+/* comentario */
 
 %token TOKEN_A
-%token TOKEN_B TOKEN_C    ← podés declarar varios en una línea
+%token TOKEN_B TOKEN_C    ← varios en una línea
 %token WS
-IGNORE WS                 ← el parser ignora este token aunque el lexer lo produzca
+IGNORE WS                 ← el parser ignora este token
 
 %%
 
@@ -123,133 +236,19 @@ produccion1:
 
 produccion2:
     TOKEN_B
-  | TOKEN_C
   | /* empty */            ← producción épsilon
 ;
 ```
 
-Reglas del formato:
-- Los **tokens** (terminales) van en **MAYÚSCULAS** — deben coincidir con los nombres de reglas en el `.yal`
-- Las **producciones** (no terminales) van en **minúsculas**
-- Las producciones vacías (ε) se escriben como `| /* empty */`
-- Las dos secciones se separan con `%%`
-- Los comentarios son `/* ... */`
+- Terminales en **MAYÚSCULAS**, no terminales en **minúsculas**
+- Producciones ε: `| /* empty */`
+- Secciones separadas por `%%`
 
-### Cómo usar Build Parser
-
-1. Abrí el archivo `.yalp` en el editor de la UI
-2. Hacé click en **◎ Build Parser**
-3. En la terminal de la UI vas a ver:
-   - Resumen de la gramática (terminales, no terminales, producciones)
-   - Sets FIRST de cada no terminal
-   - Sets FOLLOW de cada no terminal
+Abrí el `.yalp` en el editor y hacé click en **◎ Build Parser** — el output aparece en la terminal de la UI.
 
 ---
 
-## Para el equipo — dónde implementar FIRST y FOLLOW
-
-Todo el trabajo del parser vive en:
-
-```
-internal/yapar/grammar/
-  grammar.go   ← struct Grammar, Build(), Summary() y helpers
-  first.go     ← ComputeFirst()   ← implementar acá
-  follow.go    ← ComputeFollow()  ← implementar acá
-```
-
-### Flujo completo de comunicación
-
-```
-Click "Build Parser" en la UI
-         ↓
-frontend llama POST /api/yapar { yalpPath }
-         ↓
-handlers.go → ParseYalpContent() → grammar.Build() → g.Summary()
-         ↓
-responde { summary: []string }
-         ↓
-cada string del slice se imprime como una línea en la terminal de la UI
-```
-
-**El equipo solo toca `first.go` y `follow.go`.** El handler y el frontend no cambian.
-
-### El struct Grammar
-
-```go
-type Grammar struct {
-    Name         string
-    StartSymbol  string
-    Terminals    map[string]int   // nombre → token ID
-    NonTerminals map[string]bool  // conjunto de no terminales
-    Productions  []Production     // todas las reglas, una por alternativa
-    IgnoreList   []string
-
-    // Llenar estos en ComputeFirst y ComputeFollow:
-    First  map[string]map[string]bool
-    Follow map[string]map[string]bool
-}
-```
-
-### Convenciones
-
-| Concepto | Cómo representarlo |
-|---|---|
-| ε en FIRST | `g.First["X"][grammar.Epsilon] = true` |
-| Símbolo nullable | `sym.Nullable = true` + la línea de arriba |
-| Fin de input en FOLLOW | usar el string `"$"` como clave |
-| Producción ε | `len(production.Body) == 0` |
-
-### Helpers disponibles en Grammar
-
-```go
-g.ProductionsFor("expr")  // todas las producciones con ese head
-g.IsTerminal("PLUS")      // true si es token declarado
-g.IsNonTerminal("expr")   // true si es cabeza de producción
-g.IsNullable("expr")      // true si ε ∈ FIRST(expr), válido post-ComputeFirst
-```
-
-### Cómo agregar output a la UI
-
-Dentro de `Summary()` en `grammar.go`, los resultados de FIRST y FOLLOW ya están conectados. Si querés agregar secciones extra, simplemente agreguen líneas al slice antes de retornarlo:
-
-```go
-lines = append(lines, "── Mi sección ──")
-lines = append(lines, fmt.Sprintf("  resultado: %v", valor))
-```
-
----
-
-## Gramáticas de ejemplo
-
-En `workspace/specs/` hay dos gramáticas listas para probar:
-
-### `dragon.yalp` — Dragon Book §4.5
-
-Gramática clásica de expresiones aritméticas, sin epsilon. Útil para verificar FIRST/FOLLOW contra los resultados del libro.
-
-```
-FIRST(e) = { LPAREN, ID }
-FIRST(t) = { LPAREN, ID }
-FIRST(f) = { LPAREN, ID }
-```
-
-### `epsilon_test.yalp` — Gramática con múltiples épsilon
-
-Basada en ejercicio de clase:
-```
-S → a B D h
-B → c C
-C → b C | ε
-D → E F
-E → g | ε
-F → f | ε
-```
-
-Los sets FIRST y FOLLOW esperados están documentados dentro del archivo.
-
----
-
-## Estructura interna del proyecto
+## Estructura interna
 
 ```
 internal/
@@ -258,12 +257,11 @@ internal/
     automata/         ← construcción directa de DFA, minimización Hopcroft
     graph/            ← DFA → JSON para visualización
     codegen/          ← DFA + acciones → código Go
-    yalex.go / scanner.go / compile.go
   yapar/              ← pipeline del parser (autónomo)
     yapar.go          ← parseo de archivos .yalp
     grammar/
       grammar.go      ← struct Grammar, Build(), Summary()
       first.go        ← ComputeFirst()
-      follow.go        ← ComputeFollow()
+      follow.go       ← ComputeFollow()
   ds/                 ← estructuras de datos compartidas
 ```

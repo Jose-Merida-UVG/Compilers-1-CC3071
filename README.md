@@ -1,7 +1,6 @@
 # YALex / YAPar — Generador de Analizadores Léxicos y Sintácticos
 
 Proyecto de CC3071 - Diseño de Lenguajes de Programación, Universidad del Valle de Guatemala.
-
 ---
 
 ## Para el equipo — FIRST y FOLLOW

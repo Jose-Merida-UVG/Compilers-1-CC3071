@@ -38,8 +38,6 @@ type Grammar struct {
 	Productions  []Production
 	IgnoreList   []string
 
-	// FIRST and FOLLOW sets — to be implemented by the group.
-	// Key: symbol name. Value: set of terminal names.
 	// Use Epsilon ("ε") as a key in First to indicate the symbol is nullable.
 	First  map[string]map[string]bool
 	Follow map[string]map[string]bool

@@ -1,5 +1,4 @@
 /* Dragon Book §4.5 — classic unambiguous expression grammar.
-   Good for verifying FIRST/FOLLOW since the answers are in the book.
 
    FIRST(e)  = { LPAREN, ID }
    FIRST(t)  = { LPAREN, ID }
@@ -15,17 +14,14 @@
 %token LPAREN RPAREN
 
 %%
-
 e:
     e PLUS t
   | t
 ;
-
 t:
     t TIMES f
   | f
 ;
-
 f:
     LPAREN e RPAREN
   | ID

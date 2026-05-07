@@ -1,6 +1,6 @@
 /* Grammar with multiple epsilon productions — tests nullable propagation.
 
-   Original (textbook notation):
+   Original :
      S → a B D h
      B → c C
      C → b C | ε

@@ -1,7 +1,4 @@
-// Package slr builds an SLR(1) parse table from a fully-built LR(0) automaton.
-// The table has two parts: an Action table (what to do on a terminal) and a Goto
-// table (which state to enter after reducing). Conflicts are recorded and surfaced
-// as an error — if any exist, the grammar is not SLR(1).
+// Package slr builds an SLR(1) parse table from an LR(0) automaton.
 package slr
 
 import (
@@ -40,8 +37,7 @@ func (a Action) String() string {
 	}
 }
 
-// Conflict is a shift/reduce or reduce/reduce collision — two different actions
-// competing for the same (state, symbol) cell in the Action table.
+// Conflict records a shift/reduce or reduce/reduce conflict.
 type Conflict struct {
 	State    int
 	Symbol   string
@@ -54,21 +50,17 @@ func (c Conflict) String() string {
 }
 
 // Table is the complete SLR(1) parse table.
-// Action[stateID][terminal] → what to do; Goto[stateID][nonTerminal] → next state after reduce.
+//
+//	Action[stateID][terminal]    → what to do
+//	Goto[stateID][nonTerminal]   → which state to push after a reduce
 type Table struct {
 	Action    map[int]map[string]Action
 	Goto      map[int]map[string]int
 	Conflicts []Conflict
 }
 
-// Build constructs the SLR(1) parse table from a fully-built LR(0) automaton.
-// For each state and item it fills the Action and Goto tables:
-//   - dot before a terminal  → Shift to the transition target
-//   - dot before a non-terminal → Goto entry to the transition target
-//   - dot at the end → Reduce on every terminal in FOLLOW(head), or Accept for S' → S •
-//
-// Any (state, symbol) cell that would be written twice is a conflict — the grammar
-// is not SLR(1). Conflicts are recorded in Table.Conflicts; call HasConflicts() to check.
+// Build constructs the SLR(1) parse table from the LR(0) automaton.
+// The automaton must have been fully built (automaton.Build() called).
 func Build(a *lr0.Automaton) *Table {
 	productions := a.Productions
 	follow := a.Grammar.Follow
@@ -78,7 +70,7 @@ func Build(a *lr0.Automaton) *Table {
 		Goto:   make(map[int]map[string]int),
 	}
 
-	// setAction writes an Action cell, recording a conflict if the cell is already filled.
+	// Helper: set an Action cell, recording conflicts if a cell is already filled.
 	setAction := func(state int, symbol string, incoming Action) {
 		if table.Action[state] == nil {
 			table.Action[state] = make(map[string]Action)
@@ -101,15 +93,16 @@ func Build(a *lr0.Automaton) *Table {
 			prod := productions[item.ProdIndex]
 
 			if item.Dot < len(prod.Body) {
+				// Dot is NOT at the end — symbol after dot drives a shift or goto.
 				sym := prod.Body[item.Dot]
 
 				if sym.IsTerminal {
-					// Dot before a terminal: shift to the transition target.
+					// Rule 1: A → α • a β  →  Action[state][a] = Shift(target)
 					if target, ok := a.Transitions[state.ID][sym.Name]; ok {
 						setAction(state.ID, sym.Name, Action{Kind: ActionShift, State: target})
 					}
 				} else {
-					// Dot before a non-terminal: fill the Goto table.
+					// Goto table: A → α • B β  →  Goto[state][B] = target
 					if target, ok := a.Transitions[state.ID][sym.Name]; ok {
 						if table.Goto[state.ID] == nil {
 							table.Goto[state.ID] = make(map[string]int)
@@ -119,15 +112,15 @@ func Build(a *lr0.Automaton) *Table {
 				}
 
 			} else {
-				// Complete item — dot is at the end.
+				// Dot is at the end — complete item.
 
-				// Augmented production S' → S •: accept on end-of-input.
+				// Rule 3: augmented production S' → S •  →  Action[state][$] = Accept
 				if item.ProdIndex == 0 {
 					setAction(state.ID, "$", Action{Kind: ActionAccept})
 					continue
 				}
 
-				// Reduce on every terminal in FOLLOW(head).
+				// Rule 2: A → α •  →  for each t in FOLLOW(A), Action[state][t] = Reduce
 				for terminal := range follow[prod.Head] {
 					setAction(state.ID, terminal, Action{Kind: ActionReduce, ProdIdx: item.ProdIndex})
 				}
@@ -136,9 +129,4 @@ func Build(a *lr0.Automaton) *Table {
 	}
 
 	return table
-}
-
-// HasConflicts reports whether the table has any shift/reduce or reduce/reduce conflicts.
-func (t *Table) HasConflicts() bool {
-	return len(t.Conflicts) > 0
 }

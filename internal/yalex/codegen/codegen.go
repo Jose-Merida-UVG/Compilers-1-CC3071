@@ -52,6 +52,8 @@ func GenerateLexer(name string, yf *yalex.YalFile, dfa *automata.DFA, actions []
 	}
 	w(")\n\n")
 
+	w(lexemeBlock)
+
 	if header != "" {
 		w("// --- header ---\n%s\n\n", header)
 	}
@@ -210,6 +212,12 @@ type Lexer struct {
 
 	w("\t\t}\n\t}\n\treturn EOF\n}\n\n")
 
+	w("// NextToken advances to the next token and returns a Lexeme.\n")
+	w("func (l *Lexer) NextToken() Lexeme {\n")
+	w("\ttok := l.%s()\n", scanName)
+	w("\treturn Lexeme{Token: tok, Value: l.Lxm, Line: l.Ln, Col: l.Col}\n")
+	w("}\n\n")
+
 	if trailer != "" {
 		w("\n// --- trailer ---\n%s\n", trailer)
 	}
@@ -238,6 +246,174 @@ type Lexer struct {
 	}
 }
 `, name, exportedName, scanName)
+
+	return b.String()
+}
+
+// lexemeBlock is the Lexeme struct definition, shared by standalone and combined generators.
+const lexemeBlock = `// Lexeme is the unit the parser consumes: a token ID plus the matched text and position.
+type Lexeme struct {
+	Token int
+	Value string
+	Line  int
+	Col   int
+}
+
+`
+
+// TokenDef is a single token name + integer ID from a .yalp %token declaration.
+// Passed to GenerateCombined so YAPar's constants become the lexer's constants.
+type TokenDef struct {
+	Name string
+	ID   int
+}
+
+// GenerateCombined generates the lexer portion of a combined parser+lexer file.
+// Unlike GenerateLexer it has no main() and no TOKEN_N constants — instead it
+// uses the token names and IDs owned by YAPar (per CONTRACT.md). The result is
+// meant to be the top section of workspace/parsers/<name>.go, with parser tables
+// appended below it.
+func GenerateCombined(name string, yf *yalex.YalFile, dfa *automata.DFA, actions []string, tokens []TokenDef) string {
+	exportedName := capitalize(name)
+	scanName := yf.Rules[0].Entrypoint
+
+	states := dfa.GetAllStates()
+	startID := dfa.StartState.ID
+
+	var b strings.Builder
+	w := func(format string, args ...any) { fmt.Fprintf(&b, format, args...) }
+
+	w("package main\n\n")
+	w("import (\n\t\"fmt\"\n\t\"os\"\n)\n\n")
+
+	// YAPar owns the token constants — emit them here so lexer actions can return them.
+	w("const (\n")
+	w("\tEOF   = 0\n")
+	w("\tERROR = -1\n")
+	for _, t := range tokens {
+		w("\t%s = %d\n", t.Name, t.ID)
+	}
+	w(")\n\n")
+
+	w(lexemeBlock)
+
+	w(`type Lexer struct {
+	input []rune
+	pos   int
+	line  int
+	col   int
+	Lxm   string
+	Ln    int
+	Col   int
+}
+
+`)
+
+	w("func New%sLexer(input string) *Lexer {\n", exportedName)
+	w("\treturn &Lexer{input: []rune(input), pos: 0, line: 1, col: 1}\n")
+	w("}\n\n")
+
+	w("var %sTrans = map[int]map[rune]int{\n", name)
+	for _, s := range states {
+		if len(s.Transitions) == 0 {
+			continue
+		}
+		w("\t%d: {\n", s.ID)
+		for _, r := range sortedRunes(s.Transitions) {
+			w("\t\t%s: %d,\n", runeLit(r), s.Transitions[r].ID)
+		}
+		w("\t},\n")
+	}
+	w("}\n\n")
+
+	w("var %sAccept = map[int]int{\n", name)
+	for _, s := range states {
+		if s.Accept {
+			w("\t%d: %d,\n", s.ID, s.TokenID)
+		}
+	}
+	w("}\n\n")
+
+	w("func (l *Lexer) %s() int {\n", scanName)
+	w(`	for l.pos < len(l.input) {
+		startPos  := l.pos
+		startLine := l.line
+		startCol  := l.col
+		state    := %d
+		lastTok  := 0
+		lastPos  := l.pos
+		lastLine := l.line
+		lastCol  := l.col
+		curLine  := l.line
+		curCol   := l.col
+		for l.pos < len(l.input) {
+			ch := l.input[l.pos]
+			row, ok := %sTrans[state]
+			if !ok { break }
+			next, ok := row[ch]
+			if !ok { break }
+			l.pos++
+			if ch == '\n' { curLine++; curCol = 1 } else { curCol++ }
+			state = next
+			if tok := %sAccept[state]; tok != 0 {
+				lastTok = tok; lastPos = l.pos; lastLine = curLine; lastCol = curCol
+			}
+		}
+		if lastTok == 0 {
+			errStart := startPos; errLn := l.line; errCol := l.col
+			for l.pos < len(l.input) {
+				ch := l.input[l.pos]
+				if row, ok := %sTrans[%d]; ok { if _, ok := row[ch]; ok { break } }
+				if ch == '\n' { l.line++; l.col = 1 } else { l.col++ }
+				l.pos++
+			}
+			l.Lxm = string(l.input[errStart:l.pos]); l.Ln = errLn; l.Col = errCol
+			return ERROR
+		}
+		l.pos = lastPos; l.line = lastLine; l.col = lastCol
+		l.Lxm = string(l.input[startPos:lastPos]); l.Ln = startLine; l.Col = startCol
+		switch lastTok {
+`, startID, name, name, name, startID)
+
+	for i, action := range actions {
+		w("\t\tcase %d:\n", i+1)
+		a := strings.TrimSpace(action)
+		if a == "" {
+			w("\t\t\t// no action\n")
+		} else {
+			for _, ln := range strings.Split(a, "\n") {
+				w("\t\t\t%s\n", ln)
+			}
+		}
+	}
+	w("\t\t}\n\t}\n\treturn EOF\n}\n\n")
+
+	w("func (l *Lexer) NextToken() Lexeme {\n")
+	w("\ttok := l.%s()\n", scanName)
+	w("\treturn Lexeme{Token: tok, Value: l.Lxm, Line: l.Ln, Col: l.Col}\n")
+	w("}\n\n")
+
+	// Placeholder main — will be replaced by the parser entry point once parser
+	// codegen is implemented. For now it lets the file compile and run standalone.
+	w(`func main() {
+	if len(os.Args) < 2 {
+		fmt.Fprintln(os.Stderr, "usage: %s <inputfile>")
+		os.Exit(1)
+	}
+	data, err := os.ReadFile(os.Args[1])
+	if err != nil { fmt.Fprintln(os.Stderr, err); os.Exit(1) }
+	l := New%sLexer(string(data))
+	for {
+		tok := l.NextToken()
+		if tok.Token == EOF { break }
+		if tok.Token == ERROR {
+			fmt.Printf("ERROR  %%-20q  ln=%%d col=%%d\n", tok.Value, tok.Line, tok.Col)
+			continue
+		}
+		fmt.Printf("%%d  %%-20q  ln=%%d col=%%d\n", tok.Token, tok.Value, tok.Line)
+	}
+}
+`, name, exportedName)
 
 	return b.String()
 }

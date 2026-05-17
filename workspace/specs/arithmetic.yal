@@ -1,22 +1,3 @@
-(* arithmetic lexer *)
-{
-    const (
-        FLOAT  = 1
-        INT    = 2
-        PLUS   = 3
-        MINUS  = 4
-        TIMES  = 5
-        DIV    = 6
-        MOD    = 7
-        POW    = 8
-        LPAREN = 9
-        RPAREN = 10
-        COMMA  = 11
-        KWPOW  = 12
-        IDENT  = 13
-    )
-}
-
 let digit = ['0'-'9']
 let lower = ['a'-'z']
 let upper = ['A'-'Z']

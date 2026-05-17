@@ -10,9 +10,9 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/yalex"
 	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/yalex/codegen"
 	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/yalex/graph"
-	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/yalex"
 	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/yapar"
 )
 
@@ -33,7 +33,6 @@ func registerHandlers(mux *http.ServeMux, workspace string) {
 	mux.HandleFunc("POST /api/file/rename", h.renameFile)
 	mux.HandleFunc("PUT /api/directory", h.createDirectory)
 	mux.HandleFunc("POST /api/dfa", h.getDFA)
-	mux.HandleFunc("POST /api/lexer", h.runLexer)
 	mux.HandleFunc("POST /api/yapar", h.buildParser)
 	mux.HandleFunc("POST /api/run", h.runFile)
 }
@@ -263,70 +262,22 @@ func (h *apiHandler) getDFA(w http.ResponseWriter, r *http.Request) {
 	}
 	serialized := graph.SerializeDFA(compiled.DFA)
 
-	// Derive base name from the spec file (e.g. "specs/arithmetic.yal" → "arithmetic").
 	specBase := strings.TrimSuffix(filepath.Base(body.Path), ".yal")
+	lexerDir := filepath.Join(h.workspace, "programs", specBase, "lexer")
+	docsDir  := filepath.Join(h.workspace, "programs", specBase, "docs")
+	os.MkdirAll(lexerDir, 0o755)
+	os.MkdirAll(docsDir, 0o755)
 
-	// Write the DFA graph as JSON so the frontend can visualize it.
-	os.MkdirAll(filepath.Join(h.workspace, "lexers"), 0o755)
+	// Write DFA graph JSON to docs/ for the frontend visualizer.
 	if dfaJSON, err := json.Marshal(serialized); err == nil {
-		os.WriteFile(filepath.Join(h.workspace, "lexers", specBase+".dfa.json"), dfaJSON, 0o644)
+		os.WriteFile(filepath.Join(docsDir, "dfa.json"), dfaJSON, 0o644)
 	}
 
-	// Generate and write the Go lexer source file.
-	// codegen.GenerateLexer is a stub — implement it in internal/codegen/codegen.go.
+	// Write lexer.go to lexer/.
 	goSrc := codegen.GenerateLexer(specBase, yalFile, compiled.DFA, compiled.Actions)
-	os.WriteFile(filepath.Join(h.workspace, "lexers", specBase+".go"), []byte(goSrc), 0o644)
+	os.WriteFile(filepath.Join(lexerDir, "lexer.go"), []byte(goSrc), 0o644)
 
 	writeJSON(w, serialized)
-}
-
-
-func (h *apiHandler) runLexer(w http.ResponseWriter, r *http.Request) {
-	body, err := decode[struct {
-		InputPath string `json:"inputPath"`
-	}](r)
-	if err != nil || body.InputPath == "" {
-		writeError(w, http.StatusBadRequest, "inputPath required")
-		return
-	}
-
-	inputFull, err := h.resolve(body.InputPath)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	// Infer spec name from the input file extension.
-	// e.g. "input/test.arithmetic" → "arithmetic" → "lexers/arithmetic.go"
-	base := filepath.Base(body.InputPath)
-	ext := strings.TrimPrefix(filepath.Ext(base), ".")
-	if ext == "" {
-		writeError(w, http.StatusBadRequest, "cannot infer lexer: file has no extension")
-		return
-	}
-
-	lexerFile := filepath.Join(h.workspace, "lexers", ext+".go")
-	if _, err := os.Stat(lexerFile); err != nil {
-		writeError(w, http.StatusNotFound, fmt.Sprintf("no generated lexer for .%s — run DFA generation first", ext))
-		return
-	}
-
-	out, err := exec.Command("go", "run", lexerFile, inputFull).Output()
-	if err != nil {
-		if ee, ok := err.(*exec.ExitError); ok {
-			writeError(w, http.StatusUnprocessableEntity, string(ee.Stderr))
-		} else {
-			writeError(w, http.StatusInternalServerError, err.Error())
-		}
-		return
-	}
-
-	lines := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
-
-	os.MkdirAll(filepath.Join(h.workspace, "output"), 0o755)
-	os.WriteFile(filepath.Join(h.workspace, "output", base+".out"), out, 0o644)
-
-	writeJSON(w, map[string]any{"lines": lines})
 }
 
 // ─── YAPar handlers ──────────────────────────────────────────────────────────
@@ -359,18 +310,31 @@ func (h *apiHandler) buildParser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	specBase := strings.TrimSuffix(filepath.Base(body.YalpPath), ".yalp")
+
+	// Require lexer/lexer.go to exist before building the parser.
+	lexerPath  := filepath.Join(h.workspace, "programs", specBase, "lexer", "lexer.go")
+	parserDir  := filepath.Join(h.workspace, "programs", specBase, "parser")
+	docsDir    := filepath.Join(h.workspace, "programs", specBase, "docs")
+	if _, err := os.Stat(lexerPath); err != nil {
+		writeError(w, http.StatusUnprocessableEntity, fmt.Sprintf("lexer not found for %q — build the lexer first", specBase))
+		return
+	}
+	os.MkdirAll(parserDir, 0o755)
+	os.MkdirAll(docsDir, 0o755)
+
 	compiled, err := yalpFile.Compile(specBase)
 	if err != nil {
 		writeError(w, http.StatusUnprocessableEntity, fmt.Sprintf("yapar compile: %v", err))
 		return
 	}
 
-	os.MkdirAll(filepath.Join(h.workspace, "parsers"), 0o755)
-
-	// Write the LR(0) automaton as JSON for the frontend graph visualizer.
+	// Write LR(0) and SLR visualizer data to docs/.
 	if lr0JSON, err := json.Marshal(compiled.Automaton.Serialize()); err == nil {
-		os.WriteFile(filepath.Join(h.workspace, "parsers", specBase+".lr0.json"), lr0JSON, 0o644)
+		os.WriteFile(filepath.Join(docsDir, "lr0.json"), lr0JSON, 0o644)
 	}
+
+	// Write parser.go stub to parser/.
+	os.WriteFile(filepath.Join(parserDir, "parser.go"), []byte("package main\n\n// TODO: parser codegen\n"), 0o644)
 
 
 
@@ -437,16 +401,16 @@ func (h *apiHandler) buildParser(w http.ResponseWriter, r *http.Request) {
 		"stateCount":   len(compiled.Automaton.States),
 	}
 
-	// Save .slr.json so it can be reopened from the file explorer.
+	// Save slr.json to docs/ for the frontend viewer.
 	if slrJSON, err := json.Marshal(slrPayload); err == nil {
-		os.WriteFile(filepath.Join(h.workspace, "parsers", specBase+".slr.json"), slrJSON, 0o644)
+		os.WriteFile(filepath.Join(docsDir, "slr.json"), slrJSON, 0o644)
 	}
 
 	writeJSON(w, slrPayload)
 }
 
-// runFile serves POST /api/run. It prefers a generated parser over a standalone
-// lexer when both exist for the same spec name (inferred from the input extension).
+// runFile serves POST /api/run.
+// Runs programs/<spec>/*.go against the input file.
 func (h *apiHandler) runFile(w http.ResponseWriter, r *http.Request) {
 	body, err := decode[struct {
 		InputPath string `json:"inputPath"`
@@ -469,21 +433,28 @@ func (h *apiHandler) runFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Prefer parser over standalone lexer.
-	parserFile := filepath.Join(h.workspace, "parsers", ext+".go")
-	lexerFile := filepath.Join(h.workspace, "lexers", ext+".go")
-
-	var runFile string
-	if _, err := os.Stat(parserFile); err == nil {
-		runFile = parserFile
-	} else if _, err := os.Stat(lexerFile); err == nil {
-		runFile = lexerFile
-	} else {
-		writeError(w, http.StatusNotFound, fmt.Sprintf("no parser or lexer found for .%s — build one first", ext))
+	// Collect .go files from lexer/ and parser/ subdirectories.
+	var goFiles []string
+	for _, sub := range []string{"lexer", "parser"} {
+		dir := filepath.Join(h.workspace, "programs", ext, sub)
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			continue // subdirectory may not exist yet
+		}
+		for _, e := range entries {
+			if !e.IsDir() && strings.HasSuffix(e.Name(), ".go") {
+				goFiles = append(goFiles, filepath.Join(dir, e.Name()))
+			}
+		}
+	}
+	if len(goFiles) == 0 {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("no program found for %q — build the lexer first", ext))
 		return
 	}
 
-	out, err := exec.Command("go", "run", runFile, inputFull).Output()
+	args := append([]string{"run"}, goFiles...)
+	args = append(args, inputFull)
+	out, err := exec.Command("go", args...).Output()
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
 			writeError(w, http.StatusUnprocessableEntity, string(ee.Stderr))

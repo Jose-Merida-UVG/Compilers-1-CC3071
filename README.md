@@ -1,172 +1,93 @@
-# YALex / YAPar — Generador de Analizadores Léxicos y Sintácticos
-
-Proyecto de CC3071 - Diseño de Lenguajes de Programación, Universidad del Valle de Guatemala.
+# YALex / YAPar — Pendientes de implementación
 
 ---
 
-## ¿Qué hace el proyecto?
+## Codegen del parser
 
-Este proyecto implementa un generador de analizadores léxicos y sintácticos con interfaz web:
+`GenerateCombined` en `internal/yalex/codegen/codegen.go` ya existe y está lista. El handler `buildParser` en `handlers.go` escribe un stub en lugar de llamarla.
 
-- **YALex**: toma un archivo `.yal` con patrones de expresiones regulares y acciones, construye un DFA minimizado y genera un lexer en Go.
-- **YAPar**: toma un archivo `.yalp` con la gramática en formato BNF, parsea las producciones, y computa los conjuntos **FIRST** y **FOLLOW** para cada no terminal.
+### Convención de nombres
 
-Todo se controla desde una UI web: abrís un archivo en el editor, hacés click en **◎ Build Lexer** o **◎ Build Parser**, y el output aparece en la terminal integrada.
+El `.yal` y el `.yalp` deben tener el mismo nombre base:
+
+```
+specs/arithmetic.yal   +   specs/arithmetic.yalp   →   programs/arithmetic/
+```
+
+Esto es el equivalente frontend al flag `-l` del CLI:
+
+```
+yapar parser.yalp -l lexer.yal -o theparser
+```
+
+### Flujo del frontend
+
+**Build Parser** (botón activo al abrir un `.yalp`) debe hacer todo en una sola acción — no requiere "Build Lexer" previo:
+
+```
+specs/<nombre>.yalp  +  specs/<nombre>.yal  (mismo nombre base)
+  → POST /api/yapar
+  → parsear ambos archivos
+  → compilar .yal → DFA + acciones
+  → compilar .yalp → autómata LR(0) + tablas SLR(1)
+  → GenerateCombined() → dos archivos:
+      programs/<nombre>/lexer/lexer.go   ← lexer sin main()
+      programs/<nombre>/parser/parser.go ← parser + main()
+  → programs/<nombre>/docs/lr0.json
+  → programs/<nombre>/docs/slr.json
+```
+
+**Build Lexer** sigue existiendo como herramienta standalone para visualizar el DFA sin necesitar gramática.
+
+### Pasos concretos en `handlers.go: buildParser`
+
+1. Derivar `yalPath = "specs/" + specBase + ".yal"`
+2. Leer y parsear el `.yal` con `yalex.ParseYalContent()`
+3. Compilar con `yalFile.Compile()` para obtener DFA y acciones
+4. Construir `[]codegen.TokenDef` desde los tokens del `.yalp`
+5. Llamar `codegen.GenerateCombined()` con ambos
+6. Separar el output en dos archivos: lexer sin `main()`, parser con `main()`
+7. Reemplazar el stub actual
+
+### Conflicto de `main()`
+
+`GenerateCombined` actualmente genera un solo archivo con `main()`. Al dividir en dos archivos, hay que asegurarse de que solo uno tenga `main()`. El run handler recolecta todos los `.go` de `lexer/` + `parser/` y los pasa juntos a `go run` — funciona siempre que haya exactamente un `main()`.
 
 ---
 
-## Requisitos
+## Reglas del contrato pendientes
 
-- [Go 1.23+](https://go.dev/dl/)
-- [Node.js 18+](https://nodejs.org/) y npm
+### Regla 1 — Advertencia: token declarado pero nunca retornado
 
----
+Después de parsear el `.yal` y el `.yalp`, cruzar:
+- tokens declarados en `%token`
+- identificadores en `return X` dentro de las acciones del `.yal`
 
-## Cómo correr el proyecto
+Los tokens en `%token` que no aparecen en ningún `return` deben emitirse como advertencia en la terminal. No bloquea el build.
 
-### Opción A — Makefile (recomendado)
+### Regla 3 — Error: token ignorado referenciado en gramática
 
-```bash
-# Primera vez: instalar dependencias del frontend
-make frontend-install
-
-# Modo desarrollo: levanta backend y frontend en paralelo
-make dev
-```
-
-`make dev` inicia dos servidores al mismo tiempo:
-- Backend Go en `http://localhost:8080`
-- Frontend Vite en `http://localhost:5173`
-
-Abrí el navegador en **http://localhost:5173**.
-
-Para build de producción:
-
-```bash
-make build
-./yalex
-```
-
-Para limpiar artefactos:
-
-```bash
-make clean
-```
-
-### Opción B — Manual
-
-**Terminal 1 — Backend:**
-```bash
-go run .
-```
-
-**Terminal 2 — Frontend:**
-```bash
-cd frontend
-npm install      # solo la primera vez
-npm run dev
-```
-
-Abrí el navegador en **http://localhost:5173**.
+Los tokens bajo `IGNORE` en el `.yal` no deben aparecer en ninguna producción del `.yalp`. Si aparecen, retornar error antes de generar código.
 
 ---
 
-## Usar el Lexer (YALex)
+## Tabla de símbolos
 
-1. Creá un archivo `.yal` en `workspace/specs/`
-2. Escribí tu especificación léxica en el editor
-3. Hacé click en **◎ Build Lexer** — genera el DFA y el lexer en `lexers/`
-4. Creá un archivo de prueba en `workspace/input/` con extensión igual al nombre de tu spec (ej. `test.arithmetic` para `arithmetic.yal`)
-5. Abrí el archivo de prueba y hacé click en **▶ Run**
+El `main()` del parser generado debe acumular todos los tokens consumidos vía `NextToken()` e imprimir una tabla al final. El parser ya ve cada token — no requiere cambios en el lexer.
 
----
+```go
+symbolTable := map[string][]Lexeme{}
+// al consumir cada token:
+symbolTable[tok.Value] = append(symbolTable[tok.Value], tok)
 
-## Usar el Parser (YAPar)
-
-Cada parser necesita un par de archivos con el **mismo nombre base**:
-
-| Archivo | Propósito |
-|---|---|
-| `specs/nombre.yal` | Especificación léxica (patrones y acciones) |
-| `specs/nombre.yalp` | Especificación de la gramática (tokens y producciones) |
-
-### Formato de un archivo `.yalp`
-
-```
-/* comentario */
-
-%token TOKEN_A
-%token TOKEN_B TOKEN_C
-%token WS
-IGNORE WS
-
-%%
-
-produccion1:
-    produccion1 TOKEN_A produccion2
-  | produccion2
-;
-
-produccion2:
-    TOKEN_B
-  | /* empty */
-;
+// al terminar:
+fmt.Println("\n── Tabla de símbolos ──")
+fmt.Printf("%-20s %-10s %s\n", "LEXEMA", "TOKEN", "LÍNEA:COL")
+for lexeme, occurrences := range symbolTable {
+    for _, occ := range occurrences {
+        fmt.Printf("%-20s %-10d %d:%d\n", lexeme, occ.Token, occ.Line, occ.Col)
+    }
+}
 ```
 
-- Terminales en **MAYÚSCULAS**, no terminales en **minúsculas**
-- Producciones ε: `| /* empty */`
-- Secciones separadas por `%%`
-
-Abrí el `.yalp` en el editor y hacé click en **◎ Build Parser** — los conjuntos FIRST y FOLLOW aparecen en la terminal de la UI.
-
----
-
-## Gramáticas de ejemplo
-
-En `workspace/specs/` hay dos gramáticas listas.
-
-### `dragon.yalp` — Dragon Book §4.5
-
-```
-e → e PLUS t | t
-t → t TIMES f | f
-f → LPAREN e RPAREN | ID
-```
-
-### `epsilon_test.yalp` — Gramática con múltiples ε
-
-```
-S → a B D h
-B → c C
-C → b C | ε
-D → E F
-E → g | ε
-F → f | ε
-```
-
----
-
-## Estructura interna
-
-```
-internal/
-  yalex/              ← pipeline del lexer
-    regex/            ← normalización de patrones → postfix
-    automata/         ← construcción directa de DFA, minimización Hopcroft
-    graph/            ← DFA → JSON para visualización
-    codegen/          ← DFA + acciones → código Go
-  yapar/              ← pipeline del parser
-    yapar.go          ← parseo de archivos .yalp
-    grammar/
-      grammar.go      ← struct Grammar, Build(), Summary()
-      first.go        ← ComputeFirst()
-      follow.go       ← ComputeFollow()
-  ds/                 ← estructuras de datos compartidas
-
-workspace/
-  specs/    ← archivos .yal y .yalp
-  lexers/   ← lexers generados (.go)
-  parsers/  ← parsers generados (.go)
-  input/    ← archivos de prueba
-  output/   ← resultados de corridas (.out)
-```
+Output aparece en la terminal de la UI al hacer **▶ Run**.

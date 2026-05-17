@@ -66,15 +66,15 @@ export default function App() {
       let lr0Data: LR0GraphData | undefined;
       let slrData: SLRData | undefined;
       let label = node.name;
-      if (node.path.endsWith(".dfa.json") || node.path.endsWith(".dfa")) {
+      if (node.name === "dfa.json" || node.path.endsWith(".dfa.json") || node.path.endsWith(".dfa")) {
         try { dfaData = JSON.parse(content) as DFAGraphData; } catch { /* fall through */ }
-        label = node.name.replace(/\.dfa\.json$/, "").replace(/\.dfa$/, "");
-      } else if (node.path.endsWith(".lr0.json") || node.path.endsWith(".lr0")) {
+        label = node.path.split("/").slice(-2, -1)[0] + " DFA";
+      } else if (node.name === "lr0.json" || node.path.endsWith(".lr0.json") || node.path.endsWith(".lr0")) {
         try { lr0Data = JSON.parse(content) as LR0GraphData; } catch { /* fall through */ }
-        label = node.name.replace(/\.lr0\.json$/, "").replace(/\.lr0$/, "") + " LR(0)";
-      } else if (node.path.endsWith(".slr.json") || node.path.endsWith(".slr")) {
+        label = node.path.split("/").slice(-2, -1)[0] + " LR(0)";
+      } else if (node.name === "slr.json" || node.path.endsWith(".slr.json") || node.path.endsWith(".slr")) {
         try { slrData = JSON.parse(content) as SLRData; } catch { /* fall through */ }
-        label = node.name.replace(/\.slr\.json$/, "").replace(/\.slr$/, "") + " SLR";
+        label = node.path.split("/").slice(-2, -1)[0] + " SLR";
       }
       setTabs((prev) => [...prev, { path: node.path, label, content, isDirty: false, dfaData, lr0Data, slrData }]);
       setActiveTab(node.path);
@@ -119,45 +119,39 @@ export default function App() {
   }, [tabs, appendTerminal, refreshTree]);
 
   // ── DFA ─────────────────────────────────────────────────────────────────────
-  // Builds the DFA, which also saves output/<name>.dfa.json and lexers/<name>.go.
-  // Then opens the resulting .dfa.json as a tab in the main window.
+  // Builds the DFA, writes programs/<name>/lexer.go and programs/<name>/dfa.json.
   const buildDFA = useCallback(async (yalPath: string) => {
-    appendTerminal(`Building DFA from ${yalPath}…`);
+    appendTerminal(`Building lexer from ${yalPath}…`);
     try {
       const data = await api.getDFA(yalPath);
-      appendTerminal(`DFA built: ${data.nodes.length} states, ${data.edges.length} transitions.`);
+      appendTerminal(`Lexer built: ${data.nodes.length} states, ${data.edges.length} transitions.`);
 
-      // Derive artifact names, e.g. "specs/arithmetic.yal" → "arithmetic"
-      const base = yalPath.split("/").pop()?.replace(/\.yal$/, "") ?? "unknown";
-      const dfaPath = `lexers/${base}.dfa`;
-      const goPath  = `lexers/${base}.go`;
+      const base       = yalPath.split("/").pop()?.replace(/\.yal$/, "") ?? "unknown";
+      const dfaTabPath = `programs/${base}/docs/dfa.json`;
+      const lexerPath  = `programs/${base}/lexer/lexer.go`;
 
-      // Await the tree refresh so output/ and lexers/ are visible immediately.
       await refreshTree();
 
-      // Read the generated .go source so we can open it as a tab.
-      let goContent = `// lexers/${base}.go — run Build to generate.`;
-      try { goContent = await api.readFile(goPath); } catch { /* generated after getDFA */ }
+      let lexerContent = "";
+      try { lexerContent = await api.readFile(lexerPath); } catch { /* ok */ }
 
-      // Open/refresh both the DFA viewer tab and the generated Go source tab.
       setTabs((prev) => {
         const upsert = (arr: EditorTab[], tab: EditorTab) => {
           const idx = arr.findIndex((t) => t.path === tab.path);
           if (idx >= 0) { const n = [...arr]; n[idx] = tab; return n; }
           return [...arr, tab];
         };
-        // DFA tab label is just the spec name — no extension clutter.
         let next = upsert(prev, {
-          path: dfaPath, label: base, content: "", isDirty: false, dfaData: data,
+          path: dfaTabPath, label: `${base} DFA`, content: "", isDirty: false, dfaData: data,
         });
         next = upsert(next, {
-          path: goPath, label: `${base}.go`, content: goContent, isDirty: false,
+          path: lexerPath, label: `${base}/lexer.go`, content: lexerContent, isDirty: false,
         });
         return next;
       });
-      setActiveTab(dfaPath);
+      setActiveTab(dfaTabPath);
     } catch (e: any) {
-      appendTerminal(`DFA error: ${e.message}`);
+      appendTerminal(`Build error: ${e.message}`);
     }
   }, [appendTerminal, refreshTree]);
 
@@ -188,20 +182,19 @@ export default function App() {
         startSymbol:  result.startSymbol,
         stateCount:   result.stateCount,
       };
-      const slrTabPath = `parsers/${base}.slr`;
+      const slrTabPath = `programs/${base}/docs/slr.json`;
       setTabs((prev) => upsert(prev, {
         path: slrTabPath, label: `${base} SLR`, content: "", isDirty: false, slrData,
       }));
       setActiveTab(slrTabPath);
 
       // Also open the LR(0) graph tab in the background.
-      const lr0Path = `parsers/${base}.lr0.json`;
+      const lr0JsonPath = `programs/${base}/docs/lr0.json`;
       try {
-        const raw     = await api.readFile(lr0Path);
+        const raw     = await api.readFile(lr0JsonPath);
         const lr0Data = JSON.parse(raw) as LR0GraphData;
-        const lr0Tab  = `parsers/${base}.lr0`;
         setTabs((prev) => upsert(prev, {
-          path: lr0Tab, label: `${base} LR(0)`, content: "", isDirty: false, lr0Data,
+          path: lr0JsonPath, label: `${base} LR(0)`, content: "", isDirty: false, lr0Data,
         }));
       } catch { /* not critical */ }
 

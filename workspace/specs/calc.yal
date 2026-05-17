@@ -61,7 +61,7 @@ let while = "while"
 
 rule gettoken =
   ws+    {  }
-| whileee { fmt.Print("WHILE  "); return WHILE}
+| while { fmt.Print("WHILE  "); return WHILE}
 | float  { fmt.Print("FLOAT  "); return FLOAT }
 | hex    { fmt.Print("HEX    "); return HEX }
 | int    { fmt.Print("INT    "); return INT }

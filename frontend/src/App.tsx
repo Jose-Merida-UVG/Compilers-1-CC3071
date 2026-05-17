@@ -3,7 +3,7 @@ import FileExplorer from "./components/Sidebar/FileExplorer";
 import EditorPane from "./components/Editor/EditorPane";
 import TerminalPane from "./components/Terminal/TerminalPane";
 import StatusBar from "./components/StatusBar/StatusBar";
-import type { FileNode, DFAGraphData, EditorTab } from "./types";
+import type { FileNode, DFAGraphData, LR0GraphData, SLRData, EditorTab } from "./types";
 import { api } from "./api";
 import "./App.css";
 
@@ -63,12 +63,20 @@ export default function App() {
       const content = await api.readFile(node.path);
       // Parse .dfa.json files as DFA graph data — rendered as DFA viewer, not Monaco.
       let dfaData: DFAGraphData | undefined;
+      let lr0Data: LR0GraphData | undefined;
+      let slrData: SLRData | undefined;
       let label = node.name;
       if (node.path.endsWith(".dfa.json") || node.path.endsWith(".dfa")) {
         try { dfaData = JSON.parse(content) as DFAGraphData; } catch { /* fall through */ }
         label = node.name.replace(/\.dfa\.json$/, "").replace(/\.dfa$/, "");
+      } else if (node.path.endsWith(".lr0.json") || node.path.endsWith(".lr0")) {
+        try { lr0Data = JSON.parse(content) as LR0GraphData; } catch { /* fall through */ }
+        label = node.name.replace(/\.lr0\.json$/, "").replace(/\.lr0$/, "") + " LR(0)";
+      } else if (node.path.endsWith(".slr.json") || node.path.endsWith(".slr")) {
+        try { slrData = JSON.parse(content) as SLRData; } catch { /* fall through */ }
+        label = node.name.replace(/\.slr\.json$/, "").replace(/\.slr$/, "") + " SLR";
       }
-      setTabs((prev) => [...prev, { path: node.path, label, content, isDirty: false, dfaData }]);
+      setTabs((prev) => [...prev, { path: node.path, label, content, isDirty: false, dfaData, lr0Data, slrData }]);
       setActiveTab(node.path);
     } catch (e: any) {
       appendTerminal(`Error opening ${node.path}: ${e.message}`);
@@ -158,11 +166,50 @@ export default function App() {
     appendTerminal(`\nBuilding grammar from ${yalpPath}…`);
     try {
       const result = await api.buildParser(yalpPath);
-      (result.summary ?? []).forEach((line: string) => appendTerminal(line));
+
+      const base = yalpPath.split("/").pop()?.replace(/\.yalp$/, "") ?? "unknown";
+
+      const upsert = (prev: EditorTab[], tab: EditorTab) => {
+        const idx = prev.findIndex((t) => t.path === tab.path);
+        if (idx >= 0) { const n = [...prev]; n[idx] = tab; return n; }
+        return [...prev, tab];
+      };
+
+      // Extract SLR data from the response and open the SLR viewer tab.
+      const slrData: SLRData = {
+        terminals:    result.terminals,
+        nonTerminals: result.nonTerminals,
+        actions:      result.actions,
+        gotos:        result.gotos,
+        conflicts:    result.conflicts,
+        first:        result.first,
+        follow:       result.follow,
+        productions:  result.productions,
+        startSymbol:  result.startSymbol,
+        stateCount:   result.stateCount,
+      };
+      const slrTabPath = `parsers/${base}.slr`;
+      setTabs((prev) => upsert(prev, {
+        path: slrTabPath, label: `${base} SLR`, content: "", isDirty: false, slrData,
+      }));
+      setActiveTab(slrTabPath);
+
+      // Also open the LR(0) graph tab in the background.
+      const lr0Path = `parsers/${base}.lr0.json`;
+      try {
+        const raw     = await api.readFile(lr0Path);
+        const lr0Data = JSON.parse(raw) as LR0GraphData;
+        const lr0Tab  = `parsers/${base}.lr0`;
+        setTabs((prev) => upsert(prev, {
+          path: lr0Tab, label: `${base} LR(0)`, content: "", isDirty: false, lr0Data,
+        }));
+      } catch { /* not critical */ }
+
+      await refreshTree();
     } catch (e: any) {
       appendTerminal(`Parser error: ${e.message}`);
     }
-  }, [appendTerminal]);
+  }, [appendTerminal, refreshTree]);
 
   // ── Run (parser-aware) ────────────────────────────────────────────────────────
   const runFile = useCallback(async (inputPath: string) => {

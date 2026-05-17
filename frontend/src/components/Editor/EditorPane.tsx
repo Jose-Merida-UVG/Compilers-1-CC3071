@@ -3,6 +3,8 @@ import type * as Monaco from "monaco-editor";
 import type { EditorTab } from "../../types";
 import { registerYALLanguage, registerOutLanguage, registerYALPLanguage } from "../../lib/monaco-yal";
 import DFAViewer from "../DFAViewer/DFAViewer";
+import LR0Viewer from "../LR0Viewer/LR0Viewer";
+import SLRViewer from "../SLRViewer/SLRViewer";
 import MarkdownViewer from "../MarkdownViewer/MarkdownViewer";
 import "./Editor.css";
 
@@ -26,6 +28,8 @@ export default function EditorPane({
   const isYALP = activeTab?.endsWith(".yalp") ?? false;
   const isInput = !!onRunFile;
   const isDFATab = !!(active?.dfaData);
+  const isLR0Tab = !!(active?.lr0Data);
+  const isSLRTab = !!(active?.slrData);
   const isMarkdown = activeTab?.endsWith(".md") ?? false;
 
   const handleBeforeMount = (monaco: typeof Monaco) => {
@@ -91,6 +95,10 @@ export default function EditorPane({
         {active ? (
           active.dfaData ? (
             <DFAViewer data={active.dfaData} />
+          ) : active.lr0Data ? (
+            <LR0Viewer data={active.lr0Data} />
+          ) : active.slrData ? (
+            <SLRViewer data={active.slrData} />
           ) : isMarkdown ? (
             <MarkdownViewer content={active.content} />
           ) : (

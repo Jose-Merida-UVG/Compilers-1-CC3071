@@ -6,25 +6,44 @@ import (
 	"unicode"
 )
 
+// This package handles parsing and validation of .yalp grammar spec files.
+// A .yalp file has two sections separated by %%:
+//   - token section: %token declarations and IGNORE directives
+//   - productions section: CFG rules in BNF form
+//
+// This file is responsible for parsing only: ParseYalpContent reads a raw .yalp
+// string and returns a validated YalpFile. End-to-end orchestration (building
+// the grammar, computing FIRST/FOLLOW, constructing the LR(0) automaton, and
+// deriving the SLR(1) table) lives in compile.go via YalpFile.Compile() and
+// is handled via different packages.
+
+// TokenDef (terminals) are defined by ID (lexer output) + their names, non-terminals
+// don't need this translation layer since they're strictly grammar-internal.
 type TokenDef struct {
 	Name string `json:"name"`
 	ID   int    `json:"id"`
 }
 
+// Productions are defined by their non-terminal and its derivations
 type Production struct {
-	Name  string     `json:"name"`
-	Rules [][]string `json:"rules"`
+	Name  string     `json:"name"`  // LHS of production
+	Rules [][]string `json:"rules"` // RHS of production
 }
 
+// YalpFile is the fully parsed + pre-processed representation of a .yalp file / spec
 type YalpFile struct {
 	Tokens       []TokenDef
-	TokenMap     map[string]int
-	IgnoreList   []string
+	TokenMap     map[string]int // Maps string -> int for token name (string) -> ID lookups
+	IgnoreList   []string       // Tokens that are ignored by the parser
 	Productions  []Production
-	NonTerminals map[string]bool // set of all production head names
-	StartSymbol  string          // head of the first production
+	NonTerminals map[string]bool // Set of all production head names
+	StartSymbol  string          // Head of the first production
 }
 
+// ParseYalpContent parses a .yalp spec from an in-memory string. The frontend sends file
+// contents directly, so we don't interact with the filesystem. This function is also the
+// entrypoint, so it's basically a high-level overview calling auxiliary functions defined
+// in this file.
 func ParseYalpContent(content string) (*YalpFile, error) {
 	content = removeComments(content)
 
@@ -48,11 +67,15 @@ func ParseYalpContent(content string) (*YalpFile, error) {
 	return yf, nil
 }
 
+// removeComments strips /* ... */ block comments from the source string.
 func removeComments(s string) string {
 	var b strings.Builder
 	i := 0
+	// Go through the in-memory string
 	for i < len(s) {
+		// Scan for '/*'
 		if i+1 < len(s) && s[i] == '/' && s[i+1] == '*' {
+			// Move forwards and scan for '*/'
 			i += 2
 			for i < len(s) {
 				if i+1 < len(s) && s[i] == '*' && s[i+1] == '/' {
@@ -69,57 +92,87 @@ func removeComments(s string) string {
 	return b.String()
 }
 
+// parseTokenSection reads the token section (before %%) and populates yf.Tokens,
+// yf.TokenMap, and yf.IgnoreList. Each %token line may declare multiple names.
 func parseTokenSection(yf *YalpFile, section string) error {
+	// Initialize ID to 1, so we can assign increasing unique ID's to each token
+	// Note: These are used to 'translate' Lexer output, we get a Lexemme struct
+	// with Token ID + extra information.
 	id := 1
 	seen := make(map[string]bool)
 
 	for _, line := range strings.Split(section, "\n") {
+		// Ignore leading / trailing whitespace
 		line = strings.TrimSpace(line)
+		// Skip empty lines
 		if line == "" {
 			continue
 		}
 
+		// Check for %token entries
 		if strings.HasPrefix(line, "%token") {
 			rest := strings.TrimSpace(strings.TrimPrefix(line, "%token"))
 			for _, name := range strings.Fields(rest) {
+				// Validate name
 				if err := validateTokenName(name); err != nil {
 					return err
 				}
+				// Validate duplicates
 				if seen[name] {
 					return fmt.Errorf("duplicate token declaration %q", name)
 				}
+				// Add to token set + populate ID
 				seen[name] = true
 				yf.Tokens = append(yf.Tokens, TokenDef{Name: name, ID: id})
 				yf.TokenMap[name] = id
 				id++
 			}
+			// Check for IGNORE entries
 		} else if strings.HasPrefix(line, "IGNORE") {
 			name := strings.TrimSpace(strings.TrimPrefix(line, "IGNORE"))
+			//
 			if name == "" {
 				return fmt.Errorf("IGNORE requires a token name")
 			}
 			yf.IgnoreList = append(yf.IgnoreList, name)
+		} else {
+			return fmt.Errorf("unexpected token section entry %q: expected %%token or IGNORE", line)
 		}
 	}
 	return nil
 }
 
+// parseProductionSection reads the grammar rules section (after %%) and populates
+// yf.Productions, yf.NonTerminals, and yf.StartSymbol.
+// Productions are written as:
+// name:
+// body
+// | alt;
+// An empty body line means an ε production.
 func parseProductionSection(yf *YalpFile, section string) error {
+	// Iterate through lines, keeping track of current production
 	lines := strings.Split(section, "\n")
 	var current *Production
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
+		// Skip empty lines
 		if line == "" {
 			continue
 		}
 
-		// New production: a single word ending with ':'
+		// Check for line ending in ':' (new production)
 		if strings.HasSuffix(line, ":") && !strings.ContainsAny(strings.TrimSuffix(line, ":"), " \t") {
+			// If we're already 'inside' of a production then the section was not ended properly
 			if current != nil {
 				return fmt.Errorf("production %q not terminated with ;", current.Name)
 			}
+			// Extract name & populate additional struct fields
 			name := strings.TrimSuffix(line, ":")
+			// Non-terminal names must be lowercase per spec
+			if strings.ToLower(name) != name {
+				return fmt.Errorf("non-terminal name %q must be lowercase", name)
+			}
 			current = &Production{Name: name}
 			yf.NonTerminals[name] = true
 			if yf.StartSymbol == "" {
@@ -127,16 +180,18 @@ func parseProductionSection(yf *YalpFile, section string) error {
 			}
 			continue
 		}
-
+		// Check for ';' line (ends production)
 		if line == ";" {
+			// If not inside production, it's an input file error
 			if current == nil {
 				return fmt.Errorf("unexpected ;")
 			}
+			// 'Close' the production section & append to struct
 			yf.Productions = append(yf.Productions, *current)
 			current = nil
 			continue
 		}
-
+		// No current -> empty line,
 		if current == nil {
 			continue
 		}
@@ -162,6 +217,8 @@ func parseProductionSection(yf *YalpFile, section string) error {
 	return nil
 }
 
+// validate checks cross-section consistency: IGNORE tokens must be declared,
+// and every symbol referenced in a production body must be a known token or non-terminal.
 func validate(yf *YalpFile) error {
 	// IGNORE tokens must be declared
 	for _, name := range yf.IgnoreList {
@@ -180,7 +237,17 @@ func validate(yf *YalpFile) error {
 	for _, p := range yf.Productions {
 		for _, rule := range p.Rules {
 			for _, sym := range rule { // empty rule = ε, skip validation
+				if strings.ContainsRune(sym, 'ε') {
+					return fmt.Errorf("production %q: use an empty body line to express ε, not the literal character", p.Name)
+				}
 				_, isToken := yf.TokenMap[sym]
+				// Tokens must be uppercase, non-terminals must be lowercase
+				if isToken && strings.ToUpper(sym) != sym {
+					return fmt.Errorf("production %q: token %q must be uppercase", p.Name, sym)
+				}
+				if !isToken && strings.ToLower(sym) != sym {
+					return fmt.Errorf("production %q: non-terminal %q must be lowercase", p.Name, sym)
+				}
 				if !isToken && !nonTerminals[sym] {
 					return fmt.Errorf("production %q references unknown symbol %q", p.Name, sym)
 				}
@@ -191,9 +258,12 @@ func validate(yf *YalpFile) error {
 	return nil
 }
 
+// validateTokenName checks that a token name follows .yalp spec rules:
+// must be a non-empty uppercase identifier (letters, digits, underscores;
+// first character must be a letter or underscore).
 func validateTokenName(name string) error {
-	if !isValidGoIdent(name) {
-		return fmt.Errorf("invalid token name %q: must be a valid Go identifier", name)
+	if !isValidSymbolName(name) {
+		return fmt.Errorf("invalid token name %q: must start with a letter or underscore and contain only letters, digits, or underscores", name)
 	}
 	if strings.ToUpper(name) != name {
 		return fmt.Errorf("token name %q must be uppercase", name)
@@ -201,8 +271,15 @@ func validateTokenName(name string) error {
 	return nil
 }
 
-func isValidGoIdent(s string) bool {
+// isValidSymbolName reports whether s is a valid .yalp symbol name:
+// non-empty, starts with a letter or underscore, followed by letters, digits, or underscores.
+// Rejects the literal ε character — use an empty body line for epsilon productions instead.
+func isValidSymbolName(s string) bool {
 	if s == "" {
+		return false
+	}
+	// Explicitly forbid the epsilon character to give a clear error message
+	if strings.ContainsRune(s, 'ε') {
 		return false
 	}
 	for i, r := range s {

@@ -9,7 +9,7 @@
      F → f | ε
 
    In .yalp: non-terminals are lowercase, terminals are UPPERCASE.
-   Epsilon is written as an empty alternative: | /* empty */
+   Epsilon is written as an empty alternative:
 
    Expected FIRST sets:
      FIRST(s)    = { A }

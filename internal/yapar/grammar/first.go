@@ -1,93 +1,90 @@
 package grammar
 
+// ComputeFirst populates g.First for every non-terminal using fixed-point iteration,
+// there's probably a fancier way of doing this with tracking dependencies, etc. but
+// this project was done on limited time so we went for a simpler approach.
+//
+// FIRST(A) is the set of terminals that can begin a string derived from A,
+// plus ε if A is nullable. The algorithm applies three rules until no set changes
+// (uppercase = non-terminal, lowercase = terminal, X1..Xn = any body symbols):
+//
+//  1. A → ε              ⟹  ε ∈ FIRST(A)
+//  2. A → a rest         ⟹  a ∈ FIRST(A)
+//  3. A → X1 ... Xn      ⟹  add FIRST(Xi) − {ε} to FIRST(A) for each Xi;
+//     stop if Xi is not nullable; add ε if all Xi are nullable.
 func (g *Grammar) ComputeFirst() {
-    //inicializar mapa
-    g.First = make(map[string]map[string]bool)
+	// Initialize an empty FIRST set for every non-terminal.
+	g.First = make(map[string]map[string]bool)
+	for nt := range g.NonTerminals {
+		g.First[nt] = make(map[string]bool)
+	}
 
-    //crear sets vacíos para cada no terminal para evitar crashes
-    for nt := range g.NonTerminals {
-        g.First[nt] = make(map[string]bool)
-    }
+	changed := true
 
-    changed := true //bandera para saber si algo cambió
+	// Repeat until sets don't change
+	for changed {
+		changed = false
 
-    for changed {
+		// Iterate through every production
+		for i := range g.Productions {
+			prod := &g.Productions[i]
 
-        changed = false //repetimos el loop hasta que ya no hayan cambios
+			// Note: LHS non-terminal will be referred to as A in code & comments, while
+			// the current examined symbol in the RHS (body) will be referred to as sym.
+			A := prod.Head
+			body := prod.Body
 
-        //iterar sobre las producciones
-        for i := range g.Productions {
-            prod := &g.Productions[i] //obtenemos la producción actual
+			// Add epsilon to FIRST(A) if symbol derives the empty string
+			if len(body) == 0 {
+				if !g.First[A][Epsilon] {
+					g.First[A][Epsilon] = true
+					changed = true
+				}
+				continue
+			}
 
-            A := prod.Head //lado izquierdo
-            body := prod.Body //lado derecho
+			// Process body = X1 X2 … Xn
+			allNullable := true
 
-            //caso ε
-            if len(body) == 0 {
-                if !g.First[A][Epsilon] {
-                    g.First[A][Epsilon] = true //si aún no se agregó epsilon a First(A) lo agregamos
-                    changed = true //y marcamos el cambio realizado
-                }
-                continue
-            }
+			for j := range body {
+				sym := &body[j]
+				name := sym.Name
 
-            //procesar α = X1 X2 X3 ...
-            allNullable := true //se asume que todos pueden producir epsilon
+				// Terminal: add sym to FIRST(A) and stop.
+				if sym.IsTerminal {
+					if !g.First[A][name] {
+						g.First[A][name] = true
+						changed = true
+					}
+					allNullable = false
+					break
+				}
 
-            for j := range body { //recorre simbolos
-                sym := &body[j]
-                name := sym.Name
+				// Non-terminal: add FIRST(sym) − {ε} to FIRST(A).
+				for t := range g.First[name] {
+					if t == Epsilon {
+						continue
+					}
+					if !g.First[A][t] {
+						g.First[A][t] = true
+						changed = true
+					}
+				}
 
-                //si es terminal
-                if sym.IsTerminal {
-                    if !g.First[A][name] {
-                        g.First[A][name] = true //se agrega directamente el terminal
-                        /*si el lado derecho empieza con un terminal, ese es el FIRST*/
-                        changed = true //se marca el cambio
-                    }
-                    allNullable = false
-                    break //se termina, porque el terminal bloquea todo lo demás
-                }
+				// If sym is not nullable, we cannot derive ε so we stop here.
+				if !g.First[name][Epsilon] {
+					allNullable = false
+					break
+				}
+			}
 
-                //si es no terminal
-                if g.IsNonTerminal(name) {
-                    //agregar FIRST del símbolo sin ε
-                    for t := range g.First[name] {
-                        if t == Epsilon {
-                            continue
-                        }
-                        if !g.First[A][t] { //agregamos cada terminal
-                            g.First[A][t] = true
-                            changed = true
-                        }
-                    }
-
-                    //se verifica si sym es nullable y si no lo es, se detiene
-                    if !g.First[name][Epsilon] {
-                        allNullable = false
-                        break
-                    }
-                }
-            }
-
-            //si todos eran nullable se agrega epsilon
-            if allNullable {
-                if !g.First[A][Epsilon] {
-                    g.First[A][Epsilon] = true
-                    changed = true
-                }
-            }
-        }
-    }
-
-    //marcar Nullable en los símbolos, importante para FOLLOW
-    for i := range g.Productions {
-        prod := &g.Productions[i]
-        for j := range prod.Body {
-            sym := &prod.Body[j]
-            if !sym.IsTerminal {
-                sym.Nullable = g.First[sym.Name][Epsilon]
-            }
-        }
-    }
+			// If every symbol in the body is nullable, A is also nullable.
+			if allNullable {
+				if !g.First[A][Epsilon] {
+					g.First[A][Epsilon] = true
+					changed = true
+				}
+			}
+		}
+	}
 }

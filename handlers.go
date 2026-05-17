@@ -7,13 +7,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/yalex/codegen"
 	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/yalex/graph"
 	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/yalex"
 	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/yapar"
-	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/yapar/grammar"
 )
 
 
@@ -359,11 +359,90 @@ func (h *apiHandler) buildParser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	specBase := strings.TrimSuffix(filepath.Base(body.YalpPath), ".yalp")
-	g := grammar.Build(specBase, yalpFile)
+	compiled, err := yalpFile.Compile(specBase)
+	if err != nil {
+		writeError(w, http.StatusUnprocessableEntity, fmt.Sprintf("yapar compile: %v", err))
+		return
+	}
 
-	writeJSON(w, map[string]any{
-		"summary": g.Summary(),
-	})
+	os.MkdirAll(filepath.Join(h.workspace, "parsers"), 0o755)
+
+	// Write the LR(0) automaton as JSON for the frontend graph visualizer.
+	if lr0JSON, err := json.Marshal(compiled.Automaton.Serialize()); err == nil {
+		os.WriteFile(filepath.Join(h.workspace, "parsers", specBase+".lr0.json"), lr0JSON, 0o644)
+	}
+
+
+
+	// Build structured SLR table data for the frontend viewer.
+	terminals := sortedStringKeys(compiled.Grammar.Terminals)
+	terminals = append(terminals, "$")
+	nonTerminals := sortedBoolKeys(compiled.Grammar.NonTerminals)
+
+	actions := make(map[int]map[string]string)
+	for sid, row := range compiled.Table.Action {
+		actions[sid] = make(map[string]string)
+		for sym, act := range row {
+			actions[sid][sym] = act.String()
+		}
+	}
+
+	type conflictDTO struct {
+		State    int    `json:"state"`
+		Symbol   string `json:"symbol"`
+		Existing string `json:"existing"`
+		Incoming string `json:"incoming"`
+	}
+	conflicts := make([]conflictDTO, len(compiled.Table.Conflicts))
+	for i, c := range compiled.Table.Conflicts {
+		conflicts[i] = conflictDTO{c.State, c.Symbol, c.Existing.String(), c.Incoming.String()}
+	}
+
+	// Build FIRST/FOLLOW sets.
+	first := make(map[string][]string)
+	follow := make(map[string][]string)
+	for _, nt := range nonTerminals {
+		first[nt] = sortedBoolKeys(compiled.Grammar.First[nt])
+		follow[nt] = sortedBoolKeys(compiled.Grammar.Follow[nt])
+	}
+
+	// Build production list.
+	type prodDTO struct {
+		Head string `json:"head"`
+		Body string `json:"body"`
+	}
+	prods := make([]prodDTO, len(compiled.Grammar.Productions))
+	for i, p := range compiled.Grammar.Productions {
+		syms := make([]string, len(p.Body))
+		for j, s := range p.Body {
+			syms[j] = s.Name
+		}
+		body := "ε"
+		if len(syms) > 0 {
+			body = strings.Join(syms, " ")
+		}
+		prods[i] = prodDTO{p.Head, body}
+	}
+
+	slrPayload := map[string]any{
+		"terminals":    terminals,
+		"nonTerminals": nonTerminals,
+		"actions":      actions,
+		"gotos":        compiled.Table.Goto,
+		"conflicts":    conflicts,
+		"first":        first,
+		"follow":       follow,
+		"productions":  prods,
+		"startSymbol":  compiled.Grammar.StartSymbol,
+		"stateCount":   len(compiled.Automaton.States),
+	}
+
+	// Save .slr.json so it can be reopened from the file explorer.
+	if slrJSON, err := json.Marshal(slrPayload); err == nil {
+		os.WriteFile(filepath.Join(h.workspace, "parsers", specBase+".slr.json"), slrJSON, 0o644)
+	}
+
+	writeJSON(w, slrPayload)
 }
 
 // runFile serves POST /api/run. It prefers a generated parser over a standalone
@@ -420,4 +499,22 @@ func (h *apiHandler) runFile(w http.ResponseWriter, r *http.Request) {
 	os.WriteFile(filepath.Join(h.workspace, "output", base+".out"), out, 0o644)
 
 	writeJSON(w, map[string]any{"lines": lines})
+}
+
+func sortedStringKeys(m map[string]int) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func sortedBoolKeys(m map[string]bool) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }

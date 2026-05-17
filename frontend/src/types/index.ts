@@ -69,8 +69,53 @@ export interface ParserBuildResult {
   ignoreList: string[];
 }
 
+export interface LR0Node {
+  id: string;
+  label: string;
+  items: string[];
+  isStart: boolean;
+  isAccept: boolean;
+}
+
+export interface LR0Edge {
+  id: string;
+  source: string;
+  target: string;
+  symbol: string;
+}
+
+export interface LR0GraphData {
+  nodes: LR0Node[];
+  edges: LR0Edge[];
+}
+
 export interface RunOutput {
   lines: string[];
+}
+
+export interface SLRConflict {
+  state: number;
+  symbol: string;
+  existing: string;
+  incoming: string;
+}
+
+export interface SLRProduction {
+  head: string;
+  body: string;
+}
+
+export interface SLRData {
+  terminals: string[];
+  nonTerminals: string[];
+  actions: Record<number, Record<string, string>>;
+  gotos: Record<number, Record<string, number>>;
+  conflicts: SLRConflict[];
+  first: Record<string, string[]>;
+  follow: Record<string, string[]>;
+  productions: SLRProduction[];
+  startSymbol: string;
+  stateCount: number;
 }
 
 export interface EditorTab {
@@ -80,4 +125,8 @@ export interface EditorTab {
   isDirty: boolean;
   /** Populated when the tab is a .dfa.json file — renders DFA viewer instead of Monaco. */
   dfaData?: DFAGraphData;
+  /** Populated when the tab is a .lr0.json file — renders LR0 viewer instead of Monaco. */
+  lr0Data?: LR0GraphData;
+  /** Populated after Build Parser — renders SLR table + FIRST/FOLLOW viewer. */
+  slrData?: SLRData;
 }

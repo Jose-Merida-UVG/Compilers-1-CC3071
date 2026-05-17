@@ -1,17 +1,10 @@
 let x = 0xFF
-let y = 3.14
-if x > 0 else y <= 10.0
-x += 2
-x -= 1
-x *= 3
-x /= 2
-x ** 2
-a && b || !a
-a != b
-a >= b
-a == b
-iffy
-if
+let y = 3.14 + 0x1A
+if x > 0 else y
+if x == 5 && y != 3.0 else 0
+if x >= 10 || !z else x + y * 2
+let result = if x < 100 else x - 1
+foo(x, y + 1)
+!true && false || x != 0
+@@@@
 0x
-0x16
-while

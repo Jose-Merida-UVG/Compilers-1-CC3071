@@ -1,0 +1,220 @@
+/* gol.yalp — mini-Go. Usa los tokens de gol.yal.
+   Soporta: package, import, func, var, const, if/else, for, return,
+   llamadas a función, acceso a campos, indexación, expresiones completas.
+
+   BADLIT y ARROW están en el lexer pero no en esta gramática (advertencia R1).
+
+   Estructura:
+     program → package_clause SEMI imports topdecls
+     topdecl → funcdecl | vardecl | constdecl
+     funcdecl → func name(params) [type] block
+     stmt → vardecl | shortdecl | assign | call | if | for | return | inc/dec
+     expr → precedencia completa con postfix (call, index, field)
+*/
+
+%token INT FLOAT HEX
+%token KWPACKAGE KWIMPORT KWFUNC KWVAR KWCONST KWTYPE KWSTRUCT
+%token KWIF KWELSE KWFOR KWRETURN
+%token KWTRUE KWFALSE KWNIL
+%token IDENT
+%token DEFINE ASSN PLEQ MIEQ TIEQ DIEQ INC DEC
+%token EQ NEQ LEQ GEQ LT GT
+%token AND OR NOT
+%token AMP PIPE
+%token PLUS MINUS TIMES DIV MOD
+%token LBRACE RBRACE LPAREN RPAREN LBRACK RBRACK
+%token SEMI COLON DOT COMMA
+
+%%
+
+program:
+    package_clause SEMI imports topdecls
+;
+
+package_clause:
+    KWPACKAGE IDENT
+;
+
+imports:
+    imports import_decl
+  | /* empty */
+;
+
+import_decl:
+    KWIMPORT IDENT SEMI
+;
+
+topdecls:
+    topdecls topdecl
+  | /* empty */
+;
+
+topdecl:
+    funcdecl
+  | vardecl
+  | constdecl
+;
+
+funcdecl:
+    KWFUNC IDENT LPAREN params RPAREN block
+  | KWFUNC IDENT LPAREN params RPAREN type block
+;
+
+params:
+    paramlist
+  | /* empty */
+;
+
+paramlist:
+    param
+  | paramlist COMMA param
+;
+
+param:
+    IDENT type
+;
+
+type:
+    IDENT
+  | TIMES IDENT
+  | LBRACK RBRACK IDENT
+;
+
+vardecl:
+    KWVAR IDENT type SEMI
+  | KWVAR IDENT type ASSN expr SEMI
+  | KWVAR IDENT ASSN expr SEMI
+;
+
+constdecl:
+    KWCONST IDENT ASSN expr SEMI
+  | KWCONST IDENT type ASSN expr SEMI
+;
+
+block:
+    LBRACE stmts RBRACE
+;
+
+stmts:
+    stmts stmt
+  | /* empty */
+;
+
+stmt:
+    vardecl
+  | IDENT DEFINE expr SEMI
+  | IDENT ASSN expr SEMI
+  | IDENT PLEQ expr SEMI
+  | IDENT MIEQ expr SEMI
+  | IDENT TIEQ expr SEMI
+  | IDENT DIEQ expr SEMI
+  | expr INC SEMI
+  | expr DEC SEMI
+  | expr SEMI
+  | if_stmt
+  | for_stmt
+  | return_stmt
+;
+
+if_stmt:
+    KWIF expr block
+  | KWIF expr block KWELSE block
+  | KWIF expr block KWELSE if_stmt
+;
+
+for_stmt:
+    KWFOR block
+  | KWFOR expr block
+  | KWFOR simplestmt SEMI expr SEMI simplestmt block
+;
+
+simplestmt:
+    IDENT DEFINE expr
+  | IDENT ASSN expr
+  | IDENT PLEQ expr
+  | IDENT MIEQ expr
+  | expr INC
+  | expr DEC
+  | expr
+  | /* empty */
+;
+
+return_stmt:
+    KWRETURN SEMI
+  | KWRETURN expr SEMI
+;
+
+expr:
+    orexpr
+;
+
+orexpr:
+    orexpr OR andexpr
+  | andexpr
+;
+
+andexpr:
+    andexpr AND cmpexpr
+  | cmpexpr
+;
+
+cmpexpr:
+    addexpr EQ  addexpr
+  | addexpr NEQ addexpr
+  | addexpr LT  addexpr
+  | addexpr LEQ addexpr
+  | addexpr GT  addexpr
+  | addexpr GEQ addexpr
+  | addexpr
+;
+
+addexpr:
+    addexpr PLUS  mulexpr
+  | addexpr MINUS mulexpr
+  | mulexpr
+;
+
+mulexpr:
+    mulexpr TIMES unary
+  | mulexpr DIV   unary
+  | mulexpr MOD   unary
+  | mulexpr AMP   unary
+  | mulexpr PIPE  unary
+  | unary
+;
+
+unary:
+    NOT    unary
+  | MINUS  unary
+  | TIMES  unary
+  | AMP    unary
+  | postfix
+;
+
+postfix:
+    primary
+  | postfix DOT IDENT
+  | postfix LBRACK expr RBRACK
+  | postfix LPAREN args RPAREN
+;
+
+primary:
+    INT
+  | FLOAT
+  | HEX
+  | KWTRUE
+  | KWFALSE
+  | KWNIL
+  | IDENT
+  | LPAREN expr RPAREN
+;
+
+args:
+    arglist
+  | /* empty */
+;
+
+arglist:
+    expr
+  | arglist COMMA expr
+;

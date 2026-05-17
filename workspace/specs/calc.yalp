@@ -1,0 +1,100 @@
+/* calc.yalp — lenguaje de expresiones con comparaciones, lógica y bindings.
+   Usa los tokens de calc.yal.
+
+   Gramática de expresiones puras (sin sentencias con salto de línea implícito
+   ya que calc.yal no tiene SEMI ni LBRACE). Las asignaciones compuestas
+   (PLEQ, MIEQ, TIEQ, DIEQ) y WHILE están en el lexer pero no en esta gramática
+   — aparecerán como advertencia de Regla 1 cuando esté implementada.
+
+   Precedencia (menor a mayor):
+     let x = expr          (binding)
+     if cond else alt      (condicional como expresión)
+     || (or)
+     && (and)
+     == != < <= > >=       (comparación, no asociativo)
+     + -
+     * / %
+     ! (not, prefijo)
+     atom
+
+   FIRST(expr) = { KWLET, KWIF, INT, FLOAT, HEX, IDENT, LPAREN, NOT, MINUS }
+   FOLLOW(expr) = { $, KWELSE, RPAREN, COMMA }
+*/
+
+%token FLOAT INT HEX
+%token PLUS MINUS TIMES DIV MOD
+%token EQ NEQ LT LEQ GT GEQ
+%token AND OR NOT
+%token LPAREN RPAREN COMMA
+%token ASSN KWLET KWIF KWELSE
+%token IDENT
+
+%%
+
+program:
+    expr
+;
+
+expr:
+    KWLET IDENT ASSN expr
+  | KWIF orexpr KWELSE orexpr
+  | orexpr
+;
+
+orexpr:
+    orexpr OR andexpr
+  | andexpr
+;
+
+andexpr:
+    andexpr AND cmpexpr
+  | cmpexpr
+;
+
+cmpexpr:
+    addexpr EQ  addexpr
+  | addexpr NEQ addexpr
+  | addexpr LT  addexpr
+  | addexpr LEQ addexpr
+  | addexpr GT  addexpr
+  | addexpr GEQ addexpr
+  | addexpr
+;
+
+addexpr:
+    addexpr PLUS  mulexpr
+  | addexpr MINUS mulexpr
+  | mulexpr
+;
+
+mulexpr:
+    mulexpr TIMES unary
+  | mulexpr DIV   unary
+  | mulexpr MOD   unary
+  | unary
+;
+
+unary:
+    NOT unary
+  | MINUS unary
+  | primary
+;
+
+primary:
+    INT
+  | FLOAT
+  | HEX
+  | IDENT
+  | LPAREN expr RPAREN
+  | IDENT LPAREN args RPAREN
+;
+
+args:
+    arglist
+  | /* empty */
+;
+
+arglist:
+    expr
+  | arglist COMMA expr
+;

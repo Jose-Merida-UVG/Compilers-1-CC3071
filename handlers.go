@@ -311,16 +311,43 @@ func (h *apiHandler) buildParser(w http.ResponseWriter, r *http.Request) {
 
 	specBase := strings.TrimSuffix(filepath.Base(body.YalpPath), ".yalp")
 
-	// Require lexer/lexer.go to exist before building the parser.
-	lexerPath  := filepath.Join(h.workspace, "programs", specBase, "lexer", "lexer.go")
-	parserDir  := filepath.Join(h.workspace, "programs", specBase, "parser")
-	docsDir    := filepath.Join(h.workspace, "programs", specBase, "docs")
-	if _, err := os.Stat(lexerPath); err != nil {
-		writeError(w, http.StatusUnprocessableEntity, fmt.Sprintf("lexer not found for %q — build the lexer first", specBase))
+	// Build the lexer from the matching .yal spec (same name convention, mirrors -l flag).
+	yalFull, err := h.resolve(filepath.Join(filepath.Dir(body.YalpPath), specBase+".yal"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	yalContent, err := os.ReadFile(yalFull)
+	if err != nil {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("no lexer spec found for %q — expected %s.yal alongside the .yalp", specBase, specBase))
+		return
+	}
+	yalFile, err := yalex.ParseYalContent(string(yalContent))
+	if err != nil {
+		writeError(w, http.StatusUnprocessableEntity, fmt.Sprintf("yal parse: %v", err))
+		return
+	}
+	compiledLexer, err := yalFile.Compile()
+	if err != nil {
+		writeError(w, http.StatusUnprocessableEntity, fmt.Sprintf("yal compile: %v", err))
+		return
+	}
+
+	lexerDir := filepath.Join(h.workspace, "programs", specBase, "lexer")
+	parserDir := filepath.Join(h.workspace, "programs", specBase, "parser")
+	docsDir   := filepath.Join(h.workspace, "programs", specBase, "docs")
+	os.MkdirAll(lexerDir, 0o755)
 	os.MkdirAll(parserDir, 0o755)
 	os.MkdirAll(docsDir, 0o755)
+
+	// Write the standalone lexer (for Build Lexer / Run without parser).
+	lexerSrc := codegen.GenerateLexer(specBase, yalFile, compiledLexer.DFA, compiledLexer.Actions)
+	os.WriteFile(filepath.Join(lexerDir, "lexer.go"), []byte(lexerSrc), 0o644)
+
+	// Write DFA graph for the visualizer.
+	if dfaJSON, err := json.Marshal(graph.SerializeDFA(compiledLexer.DFA)); err == nil {
+		os.WriteFile(filepath.Join(docsDir, "dfa.json"), dfaJSON, 0o644)
+	}
 
 	compiled, err := yalpFile.Compile(specBase)
 	if err != nil {

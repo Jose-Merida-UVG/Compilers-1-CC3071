@@ -48,7 +48,7 @@ func (f *YalpFile) Compile(specName string) (*CompiledParser, error) {
 
 	// Build SLR table and fail fast if the grammar has conflicts.
 	table := slr.Build(automaton)
-	if table.HasConflicts() {
+	if len(table.Conflicts) > 0 {
 		return nil, fmt.Errorf("grammar is not SLR(1): %d conflict(s) — first: %s", len(table.Conflicts), table.Conflicts[0])
 	}
 

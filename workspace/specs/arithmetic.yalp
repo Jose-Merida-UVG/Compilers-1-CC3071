@@ -1,28 +1,58 @@
-/* Dragon Book §4.5 — classic unambiguous expression grammar.
+/* arithmetic.yalp — expressiones aritméticas con precedencia completa.
+   Usa los tokens de arithmetic.yal.
 
-   FIRST(e)  = { LPAREN, ID }
-   FIRST(t)  = { LPAREN, ID }
-   FIRST(f)  = { LPAREN, ID }
-   FOLLOW(e) = { $, PLUS, RPAREN }
-   FOLLOW(t) = { $, PLUS, TIMES, RPAREN }
-   FOLLOW(f) = { $, PLUS, TIMES, RPAREN }
+   Precedencia (menor a mayor):
+     + -        (additive)
+     * / %      (multiplicative)
+     **         (power, right-assoc via right recursion)
+     atom       (literal, ident, llamada a función, kwpow, paréntesis)
+
+   FIRST/FOLLOW relevantes:
+     FIRST(expr)  = { INT, FLOAT, IDENT, LPAREN, KWPOW }
+     FOLLOW(expr) = { $, RPAREN, COMMA }
 */
 
-%token ID
-%token PLUS
-%token TIMES
-%token LPAREN RPAREN
+%token FLOAT INT
+%token POW KWPOW
+%token PLUS MINUS TIMES DIV MOD
+%token LPAREN RPAREN COMMA
+%token IDENT
 
 %%
-e:
-    e PLUS t
-  | t
+
+expr:
+    expr PLUS term
+  | expr MINUS term
+  | term
 ;
-t:
-    t TIMES f
-  | f
+
+term:
+    term TIMES power
+  | term DIV power
+  | term MOD power
+  | power
 ;
-f:
-    LPAREN e RPAREN
-  | ID
+
+power:
+    atom POW power
+  | atom
+;
+
+atom:
+    INT
+  | FLOAT
+  | IDENT
+  | LPAREN expr RPAREN
+  | KWPOW LPAREN expr COMMA expr RPAREN
+  | IDENT LPAREN args RPAREN
+;
+
+args:
+    arglist
+  | /* empty */
+;
+
+arglist:
+    expr
+  | arglist COMMA expr
 ;

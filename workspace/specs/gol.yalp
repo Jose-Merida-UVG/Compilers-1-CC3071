@@ -125,18 +125,6 @@ if_stmt:
 for_stmt:
     KWFOR block
   | KWFOR expr block
-  | KWFOR simplestmt SEMI expr SEMI simplestmt block
-;
-
-simplestmt:
-    IDENT DEFINE expr
-  | IDENT ASSN expr
-  | IDENT PLEQ expr
-  | IDENT MIEQ expr
-  | expr INC
-  | expr DEC
-  | expr
-  | /* empty */
 ;
 
 return_stmt:

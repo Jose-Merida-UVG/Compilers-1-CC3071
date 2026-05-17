@@ -17,8 +17,9 @@
      ! (not, prefijo)
      atom
 
-   FIRST(expr) = { KWLET, KWIF, INT, FLOAT, HEX, IDENT, LPAREN, NOT, MINUS }
-   FOLLOW(expr) = { $, KWELSE, RPAREN, COMMA }
+   FIRST(expr)   = { KWLET, KWIF, INT, FLOAT, HEX, IDENT, LPAREN, NOT, MINUS }
+   FOLLOW(expr)   = { $, RPAREN, COMMA }
+   FOLLOW(orexpr) = { $, RPAREN, COMMA, KWELSE, OR }
 */
 
 %token FLOAT INT HEX

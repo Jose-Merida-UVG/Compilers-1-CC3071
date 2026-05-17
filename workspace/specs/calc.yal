@@ -1,39 +1,4 @@
 (* calc lexer - hex, comparison, logic, compound assignment *)
-{
-    const (
-        FLOAT  = 1
-        INT    = 2
-        HEX    = 3
-        PLUS   = 4
-        MINUS  = 5
-        TIMES  = 6
-        DIV    = 7
-        MOD    = 8
-        POW    = 9
-        PLEQ   = 10
-        MIEQ   = 11
-        TIEQ   = 12
-        DIEQ   = 13
-        ASSN   = 14
-        EQ     = 15
-        NEQ    = 16
-        LT     = 17
-        LEQ    = 18
-        GT     = 19
-        GEQ    = 20
-        AND    = 21
-        OR     = 22
-        NOT    = 23
-        LPAREN = 24
-        RPAREN = 25
-        COMMA  = 26
-        KWLET  = 27
-        KWIF   = 28
-        KWELSE = 29
-        IDENT  = 30
-        WHILE = 31
-    )
-}
 
 let digit  = ['0'-'9']
 let lower  = ['a'-'z']

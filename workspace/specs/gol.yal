@@ -1,64 +1,4 @@
 (* go-like lexer *)
-{
-    const (
-        INT    = 1
-        FLOAT  = 2
-        HEX    = 3
-        BADLIT = 4
-
-        KWPACKAGE = 5
-        KWIMPORT  = 6
-        KWFUNC    = 7
-        KWVAR     = 8
-        KWCONST   = 9
-        KWTYPE    = 10
-        KWSTRUCT  = 11
-        KWIF      = 12
-        KWELSE    = 13
-        KWFOR     = 14
-        KWRETURN  = 15
-        KWTRUE    = 16
-        KWFALSE   = 17
-        KWNIL     = 18
-
-        IDENT  = 19
-        DEFINE = 20
-        PLEQ   = 21
-        MIEQ   = 22
-        TIEQ   = 23
-        DIEQ   = 24
-        INC    = 25
-        DEC    = 26
-        EQ     = 27
-        NEQ    = 28
-        LEQ    = 29
-        GEQ    = 30
-        AND    = 31
-        OR     = 32
-        ARROW  = 33
-        ASSN   = 34
-        PLUS   = 35
-        MINUS  = 36
-        TIMES  = 37
-        DIV    = 38
-        MOD    = 39
-        LT     = 40
-        GT     = 41
-        NOT    = 42
-        AMP    = 43
-        PIPE   = 44
-        LBRACE = 45
-        RBRACE = 46
-        LPAREN = 47
-        RPAREN = 48
-        LBRACK = 49
-        RBRACK = 50
-        SEMI   = 51
-        COLON  = 52
-        DOT    = 53
-        COMMA  = 54
-    )
-}
 
 let digit   = ['0'-'9']
 let lower   = ['a'-'z']
@@ -77,7 +17,7 @@ let mieq    = "-="
 let tieq    = "*="
 let dieq    = "/="
 let inc     = "++"
-let dec     = "--" - -
+let dec     = "--"
 let eq      = "=="
 let neq     = "!="
 let leq     = "<="

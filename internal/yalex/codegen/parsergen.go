@@ -14,9 +14,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/yapar/slr"
 	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/yapar/grammar"
 	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/yapar/lr0"
+	"github.com/Jose-Merida-UVG/Compilers-1-CC3071/internal/yapar/slr"
 )
 
 type ParserSpec struct {
@@ -47,7 +47,10 @@ func GenerateParser(spec ParserSpec) string {
 	w := func(format string, args ...any) { fmt.Fprintf(&b, format, args...) }
 
 	w("package main\n\n")
-	w("import \"fmt\"\n\n")
+	w("import (\n")
+	w("\t\"fmt\"\n")
+	w("\t\"os\"\n")
+	w(")\n\n")
 
 	// ACTION TABLE
 	// Encode ActionKind as int so we can embed it without importing slr/.
@@ -137,6 +140,9 @@ func Parse(l *Lexer) error {
 	nextToken := func() {
 		for {
 			cur = l.NextToken()
+			if cur.Token != EOF && cur.Token != ERROR {
+				symbolTable[cur.Value] = append(symbolTable[cur.Value], cur)
+			}
 			if !parserIgnore[cur.Token] {
 				break
 			}
@@ -147,6 +153,7 @@ func Parse(l *Lexer) error {
 	// Map token ID → terminal name for table look-ups.
 	// The reverse map is built from the constant values embedded in the file.
 	tokName := tokenIDToName()
+	symbolTable := map[string][]Lexeme{}
 
 	for {
 		state := peek()
@@ -155,8 +162,12 @@ func Parse(l *Lexer) error {
 			if name, ok := tokName[cur.Token]; ok {
 				sym = name
 			} else {
-				return fmt.Errorf("line %d col %d: unexpected token %d %q",
-					cur.Line, cur.Col, cur.Token, cur.Value)
+				return fmt.Errorf(
+					"syntax error: unexpected %s at line %d, col %d",
+					sym,
+					cur.Line,
+					cur.Col,
+				)
 			}
 		}
 
@@ -196,8 +207,21 @@ func Parse(l *Lexer) error {
 			stk = append(stk, next)
 
 		case 3: // accept
-			return nil
+			fmt.Println("\n── Tabla de símbolos ──")
+			fmt.Printf("%-20s %-10s %s\n", "LEXEMA", "TOKEN", "LÍNEA:COL")
 
+			for lexeme, occs := range symbolTable {
+				for _, occ := range occs {
+					fmt.Printf(
+						"%-20s %-10d %d:%d\n",
+						lexeme,
+						occ.Token,
+						occ.Line,
+						occ.Col,
+					)
+				}
+			}
+			return nil
 		default:
 			return fmt.Errorf("line %d col %d: parse error (state %d, token %q)",
 				cur.Line, cur.Col, state, sym)
@@ -243,12 +267,12 @@ func GenerateCombinedMain(name string) string {
 	var b strings.Builder
 	w := func(format string, args ...any) { fmt.Fprintf(&b, format, args...) }
 
-	w(`import (
-	"fmt"
-	"os"
-)
+// 	w(`import (
+// 	"fmt"
+// 	"os"
+// )
 
-`)
+// `)
 	w("func main() {\n")
 	w("\tif len(os.Args) < 2 {\n")
 	w("\t\tfmt.Fprintln(os.Stderr, \"usage: %s <inputfile>\")\n", name)

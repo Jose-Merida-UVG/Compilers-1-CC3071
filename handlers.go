@@ -341,8 +341,8 @@ func (h *apiHandler) buildParser(w http.ResponseWriter, r *http.Request) {
 	os.MkdirAll(docsDir, 0o755)
 
 	// Write the standalone lexer (for Build Lexer / Run without parser).
-	lexerSrc := codegen.GenerateLexer(specBase, yalFile, compiledLexer.DFA, compiledLexer.Actions)
-	os.WriteFile(filepath.Join(lexerDir, "lexer.go"), []byte(lexerSrc), 0o644)
+	// lexerSrc := codegen.GenerateLexer(specBase, yalFile, compiledLexer.DFA, compiledLexer.Actions)
+	// os.WriteFile(filepath.Join(lexerDir, "lexer.go"), []byte(lexerSrc), 0o644)
 
 	// Write DFA graph for the visualizer.
 	if dfaJSON, err := json.Marshal(graph.SerializeDFA(compiledLexer.DFA)); err == nil {
@@ -355,14 +355,55 @@ func (h *apiHandler) buildParser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Build codegen token defs from %token declarations.
+	tokenDefs := make([]codegen.TokenDef, len(yalpFile.Tokens))
+	for i, t := range yalpFile.Tokens {
+		tokenDefs[i] = codegen.TokenDef{
+			Name: t.Name,
+			ID:   t.ID,
+		}
+	}
+
 	// Write LR(0) and SLR visualizer data to docs/.
 	if lr0JSON, err := json.Marshal(compiled.Automaton.Serialize()); err == nil {
 		os.WriteFile(filepath.Join(docsDir, "lr0.json"), lr0JSON, 0o644)
 	}
 
 	// Write parser.go stub to parser/.
-	os.WriteFile(filepath.Join(parserDir, "parser.go"), []byte("package main\n\n// TODO: parser codegen\n"), 0o644)
+	//os.WriteFile(filepath.Join(parserDir, "parser.go"), []byte("package main\n\n// TODO: parser codegen\n"), 0o644)
+	// Generate lexer WITHOUT main().
+	combinedLexer := codegen.GenerateCombined(
+		specBase,
+		yalFile,
+		compiledLexer.DFA,
+		compiledLexer.Actions,
+		tokenDefs,
+	)
 
+	// Write lexer.go.
+	os.WriteFile(
+		filepath.Join(lexerDir, "lexer.go"),
+		[]byte(combinedLexer),
+		0o644,
+	)
+
+	// Generate parser.go WITH Parse() + main().
+	parserSrc := codegen.GenerateParser(codegen.ParserSpec{
+		Name:      specBase,
+		Grammar:   compiled.Grammar,
+		Automaton: compiled.Automaton,
+		Table:     compiled.Table,
+	})
+
+	// Append generated main().
+	parserSrc += "\n\n" + codegen.GenerateCombinedMain(specBase)
+
+	// Write parser.go.
+	os.WriteFile(
+		filepath.Join(parserDir, "parser.go"),
+		[]byte(parserSrc),
+		0o644,
+	)
 
 
 	// Build structured SLR table data for the frontend viewer.

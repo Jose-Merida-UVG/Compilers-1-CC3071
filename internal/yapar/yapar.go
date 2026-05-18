@@ -255,6 +255,27 @@ func validate(yf *YalpFile) error {
 		}
 	}
 
+		// Rule 3:
+	// Tokens declared under IGNORE cannot appear in productions.
+	ignoreSet := make(map[string]bool)
+	for _, tok := range yf.IgnoreList {
+		ignoreSet[tok] = true
+	}
+
+	for _, p := range yf.Productions {
+		for _, rule := range p.Rules {
+			for _, sym := range rule {
+				if ignoreSet[sym] {
+					return fmt.Errorf(
+						"token %q is declared IGNORE but used in production %q",
+						sym,
+						p.Name,
+					)
+				}
+			}
+		}
+	}
+
 	return nil
 }
 

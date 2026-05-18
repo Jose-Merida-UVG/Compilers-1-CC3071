@@ -7,7 +7,7 @@ let int   = digit+
 let float = digit+ '.' digit+
 let pow   = "**"
 let kwpow = "pow"
-let ws    = [' ' '\t' '\r']
+let ws    = [' ' '\t' '\n' '\r']
 
 rule gettoken =
   ws+          {  }
@@ -24,4 +24,3 @@ rule gettoken =
 | ')'          { fmt.Print("RPAREN "); return RPAREN }
 | ','          { fmt.Print("COMMA  "); return COMMA }
 | alpha alnum* { fmt.Print("IDENT  "); return IDENT }
-| '\n'         { return NEWLINE }

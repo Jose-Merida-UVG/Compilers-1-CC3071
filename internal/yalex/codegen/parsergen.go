@@ -50,6 +50,7 @@ func GenerateParser(spec ParserSpec) string {
 	w("import (\n")
 	w("\t\"fmt\"\n")
 	w("\t\"os\"\n")
+	w("\t\"strings\"\n")
 	w(")\n\n")
 
 	// ACTION TABLE
@@ -99,13 +100,20 @@ func GenerateParser(spec ParserSpec) string {
 	w("}\n\n")
 
 	// PRODUCTION TABLE
-	// head name + body length for each production so the reduce action
-	// knows how many symbols to pop and what non-terminal to expose.
-	w("// parserProd describes one production: its head symbol and body length.\n")
-	w("type parserProd struct{ head string; bodyLen int }\n\n")
+	// head name + body symbols for each production.
+	w("// parserProd describes one production: its head symbol, body symbols, and body length.\n")
+	w("type parserProd struct{ head string; body string; bodyLen int }\n\n")
 	w("var parserProds = []parserProd{\n")
 	for i, p := range prods {
-		w("\t%d: {%q, %d},\n", i, p.Head, len(p.Body))
+		bodySyms := make([]string, len(p.Body))
+		for j, sym := range p.Body {
+			bodySyms[j] = sym.Name
+		}
+		bodyStr := "ε"
+		if len(bodySyms) > 0 {
+			bodyStr = strings.Join(bodySyms, " ")
+		}
+		w("\t%d: {%q, %q, %d},\n", i, p.Head, bodyStr, len(p.Body))
 	}
 	w("}\n\n")
 
@@ -135,20 +143,21 @@ func Parse(l *Lexer) error {
 	stk := []int{0}
 	peek := func() int { return stk[len(stk)-1] }
 
+	// Symbol stack — tracks the sentential form for derivation display.
+	var symStk []string
+
 	// Fetch the first non-ignored token.
 	var cur Lexeme
 
-	symbolTable := map[string][]Lexeme{}
+	var symbolTable []Lexeme
+	var sententialForms []string
 
 	nextToken := func() {
 		for {
 			cur = l.NextToken()
 
 			if cur.Token != EOF && cur.Token != ERROR {
-				symbolTable[cur.Value] = append(
-					symbolTable[cur.Value],
-					cur,
-				)
+				symbolTable = append(symbolTable, cur)
 			}
 
 			if !parserIgnore[cur.Token] {
@@ -161,8 +170,20 @@ func Parse(l *Lexer) error {
 	// Map token ID → terminal name for table look-ups.
 	tokName := tokenIDToName()
 
+	fmt.Println("── Parse Actions ──")
+
 	for {
 		state := peek()
+
+		// If we hit an ERROR token from the lexer, immediately fail.
+		if cur.Token == ERROR {
+			return fmt.Errorf(
+				"lexical error: unrecognized input '%%s' at line %%d, col %%d",
+				cur.Value,
+				cur.Line,
+				cur.Col,
+			)
+		}
 
 		sym := "$"
 		if cur.Token != EOF {
@@ -170,7 +191,7 @@ func Parse(l *Lexer) error {
 				sym = name
 			} else {
 				return fmt.Errorf(
-					"syntax error: unexpected %%d at line %%d, col %%d",
+					"syntax error: unexpected token %%d at line %%d, col %%d",
 					cur.Token,
 					cur.Line,
 					cur.Col,
@@ -202,11 +223,25 @@ func Parse(l *Lexer) error {
 		switch act.kind {
 
 		case 1: // shift
+			symName := tokenName(cur, tokName)
+			fmt.Printf("Shift:  %%s\n", symName)
+			symStk = append(symStk, symName)
 			stk = append(stk, act.arg)
 			nextToken()
 
 		case 2: // reduce
 			prod := parserProds[act.arg]
+			bodyStr := prodBody(act.arg)
+			fmt.Printf("Reduce: %%s → %%s\n", prod.head, bodyStr)
+
+			// Pop body symbols and push head.
+			if prod.bodyLen > 0 {
+				symStk = symStk[:len(symStk)-prod.bodyLen]
+			}
+			symStk = append(symStk, prod.head)
+
+			// Record the current sentential form.
+			sententialForms = append(sententialForms, joinSymbols(symStk))
 
 			// Pop |body| states off the stack.
 			stk = stk[:len(stk)-prod.bodyLen]
@@ -235,19 +270,23 @@ func Parse(l *Lexer) error {
 			stk = append(stk, next)
 
 		case 3: // accept
-			fmt.Println("\n── Tabla de símbolos ──")
-			fmt.Printf("%%-20s %%-10s %%s\n", "LEXEMA", "TOKEN", "LÍNEA:COL")
+			fmt.Println("\n\n── Sentential Forms (Rightmost Derivation in Reverse) ──")
+			for i, form := range sententialForms {
+				fmt.Printf("%%d. %%s\n", i+1, form)
+			}
 
-			for lexeme, occs := range symbolTable {
-				for _, occ := range occs {
-					fmt.Printf(
-						"%%-20s %%-10d %%d:%%d\n",
-						lexeme,
-						occ.Token,
-						occ.Line,
-						occ.Col,
-					)
-				}
+			fmt.Println("\n── Symbol Table ──")
+			fmt.Printf("%%-20s %%-20s %%-10s\n", "LEXEME", "TOKEN", "LINE:COL")
+
+			for _, lex := range symbolTable {
+				tokenStr := tokenName(lex, tokName)
+				fmt.Printf(
+					"%%-20s %%-20s %%d:%%d\n",
+					lex.Value,
+					tokenStr,
+					lex.Line,
+					lex.Col,
+				)
 			}
 
 			return nil
@@ -262,6 +301,27 @@ func Parse(l *Lexer) error {
 			)
 		}
 	}
+}
+
+func tokenName(lex Lexeme, tokName map[int]string) string {
+	if lex.Token == EOF {
+		return "$"
+	}
+	if name, ok := tokName[lex.Token]; ok {
+		return name
+	}
+	return fmt.Sprintf("TOKEN%%d", lex.Token)
+}
+
+func prodBody(idx int) string {
+	return parserProds[idx].body
+}
+
+func joinSymbols(syms []string) string {
+	if len(syms) == 0 {
+		return "ε"
+	}
+	return strings.Join(syms, " ")
 }
 
 `)

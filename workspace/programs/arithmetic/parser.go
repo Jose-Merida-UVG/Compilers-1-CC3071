@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
 // parserAction encodes one cell of the SLR(1) ACTION table.
@@ -12,49 +13,13 @@ type parserAction struct{ kind, arg int }
 // parserActionTable[state][terminal] → action
 var parserActionTable = map[int]map[string]parserAction{
 	0: {
-		"FLOAT": {1, 6},
-		"IDENT": {1, 7},
-		"INT": {1, 5},
-		"KWPOW": {1, 8},
-		"LPAREN": {1, 9},
+		"FLOAT": {1, 5},
+		"IDENT": {1, 2},
+		"INT": {1, 1},
+		"KWPOW": {1, 7},
+		"LPAREN": {1, 6},
 	},
 	1: {
-		"$": {3, 0},
-		"MINUS": {1, 11},
-		"PLUS": {1, 10},
-	},
-	2: {
-		"$": {2, 3},
-		"COMMA": {2, 3},
-		"DIV": {1, 12},
-		"MINUS": {2, 3},
-		"MOD": {1, 13},
-		"PLUS": {2, 3},
-		"RPAREN": {2, 3},
-		"TIMES": {1, 14},
-	},
-	3: {
-		"$": {2, 7},
-		"COMMA": {2, 7},
-		"DIV": {2, 7},
-		"MINUS": {2, 7},
-		"MOD": {2, 7},
-		"PLUS": {2, 7},
-		"RPAREN": {2, 7},
-		"TIMES": {2, 7},
-	},
-	4: {
-		"$": {2, 9},
-		"COMMA": {2, 9},
-		"DIV": {2, 9},
-		"MINUS": {2, 9},
-		"MOD": {2, 9},
-		"PLUS": {2, 9},
-		"POW": {1, 15},
-		"RPAREN": {2, 9},
-		"TIMES": {2, 9},
-	},
-	5: {
 		"$": {2, 10},
 		"COMMA": {2, 10},
 		"DIV": {2, 10},
@@ -65,7 +30,39 @@ var parserActionTable = map[int]map[string]parserAction{
 		"RPAREN": {2, 10},
 		"TIMES": {2, 10},
 	},
-	6: {
+	2: {
+		"$": {2, 12},
+		"COMMA": {2, 12},
+		"DIV": {2, 12},
+		"LPAREN": {1, 10},
+		"MINUS": {2, 12},
+		"MOD": {2, 12},
+		"PLUS": {2, 12},
+		"POW": {2, 12},
+		"RPAREN": {2, 12},
+		"TIMES": {2, 12},
+	},
+	3: {
+		"$": {2, 3},
+		"COMMA": {2, 3},
+		"DIV": {1, 11},
+		"MINUS": {2, 3},
+		"MOD": {1, 12},
+		"PLUS": {2, 3},
+		"RPAREN": {2, 3},
+		"TIMES": {1, 13},
+	},
+	4: {
+		"$": {2, 7},
+		"COMMA": {2, 7},
+		"DIV": {2, 7},
+		"MINUS": {2, 7},
+		"MOD": {2, 7},
+		"PLUS": {2, 7},
+		"RPAREN": {2, 7},
+		"TIMES": {2, 7},
+	},
+	5: {
 		"$": {2, 11},
 		"COMMA": {2, 11},
 		"DIV": {2, 11},
@@ -76,111 +73,108 @@ var parserActionTable = map[int]map[string]parserAction{
 		"RPAREN": {2, 11},
 		"TIMES": {2, 11},
 	},
+	6: {
+		"FLOAT": {1, 5},
+		"IDENT": {1, 2},
+		"INT": {1, 1},
+		"KWPOW": {1, 7},
+		"LPAREN": {1, 6},
+	},
 	7: {
-		"$": {2, 12},
-		"COMMA": {2, 12},
-		"DIV": {2, 12},
-		"LPAREN": {1, 16},
-		"MINUS": {2, 12},
-		"MOD": {2, 12},
-		"PLUS": {2, 12},
-		"POW": {2, 12},
-		"RPAREN": {2, 12},
-		"TIMES": {2, 12},
+		"LPAREN": {1, 15},
 	},
 	8: {
-		"LPAREN": {1, 17},
+		"$": {3, 0},
+		"MINUS": {1, 17},
+		"PLUS": {1, 16},
 	},
 	9: {
-		"FLOAT": {1, 6},
-		"IDENT": {1, 7},
-		"INT": {1, 5},
-		"KWPOW": {1, 8},
-		"LPAREN": {1, 9},
+		"$": {2, 9},
+		"COMMA": {2, 9},
+		"DIV": {2, 9},
+		"MINUS": {2, 9},
+		"MOD": {2, 9},
+		"PLUS": {2, 9},
+		"POW": {1, 18},
+		"RPAREN": {2, 9},
+		"TIMES": {2, 9},
 	},
 	10: {
-		"FLOAT": {1, 6},
-		"IDENT": {1, 7},
-		"INT": {1, 5},
-		"KWPOW": {1, 8},
-		"LPAREN": {1, 9},
-	},
-	11: {
-		"FLOAT": {1, 6},
-		"IDENT": {1, 7},
-		"INT": {1, 5},
-		"KWPOW": {1, 8},
-		"LPAREN": {1, 9},
-	},
-	12: {
-		"FLOAT": {1, 6},
-		"IDENT": {1, 7},
-		"INT": {1, 5},
-		"KWPOW": {1, 8},
-		"LPAREN": {1, 9},
-	},
-	13: {
-		"FLOAT": {1, 6},
-		"IDENT": {1, 7},
-		"INT": {1, 5},
-		"KWPOW": {1, 8},
-		"LPAREN": {1, 9},
-	},
-	14: {
-		"FLOAT": {1, 6},
-		"IDENT": {1, 7},
-		"INT": {1, 5},
-		"KWPOW": {1, 8},
-		"LPAREN": {1, 9},
-	},
-	15: {
-		"FLOAT": {1, 6},
-		"IDENT": {1, 7},
-		"INT": {1, 5},
-		"KWPOW": {1, 8},
-		"LPAREN": {1, 9},
-	},
-	16: {
-		"FLOAT": {1, 6},
-		"IDENT": {1, 7},
-		"INT": {1, 5},
-		"KWPOW": {1, 8},
-		"LPAREN": {1, 9},
+		"FLOAT": {1, 5},
+		"IDENT": {1, 2},
+		"INT": {1, 1},
+		"KWPOW": {1, 7},
+		"LPAREN": {1, 6},
 		"RPAREN": {2, 17},
 	},
+	11: {
+		"FLOAT": {1, 5},
+		"IDENT": {1, 2},
+		"INT": {1, 1},
+		"KWPOW": {1, 7},
+		"LPAREN": {1, 6},
+	},
+	12: {
+		"FLOAT": {1, 5},
+		"IDENT": {1, 2},
+		"INT": {1, 1},
+		"KWPOW": {1, 7},
+		"LPAREN": {1, 6},
+	},
+	13: {
+		"FLOAT": {1, 5},
+		"IDENT": {1, 2},
+		"INT": {1, 1},
+		"KWPOW": {1, 7},
+		"LPAREN": {1, 6},
+	},
+	14: {
+		"MINUS": {1, 17},
+		"PLUS": {1, 16},
+		"RPAREN": {1, 25},
+	},
+	15: {
+		"FLOAT": {1, 5},
+		"IDENT": {1, 2},
+		"INT": {1, 1},
+		"KWPOW": {1, 7},
+		"LPAREN": {1, 6},
+	},
+	16: {
+		"FLOAT": {1, 5},
+		"IDENT": {1, 2},
+		"INT": {1, 1},
+		"KWPOW": {1, 7},
+		"LPAREN": {1, 6},
+	},
 	17: {
-		"FLOAT": {1, 6},
-		"IDENT": {1, 7},
-		"INT": {1, 5},
-		"KWPOW": {1, 8},
-		"LPAREN": {1, 9},
+		"FLOAT": {1, 5},
+		"IDENT": {1, 2},
+		"INT": {1, 1},
+		"KWPOW": {1, 7},
+		"LPAREN": {1, 6},
 	},
 	18: {
-		"MINUS": {1, 11},
-		"PLUS": {1, 10},
-		"RPAREN": {1, 29},
+		"FLOAT": {1, 5},
+		"IDENT": {1, 2},
+		"INT": {1, 1},
+		"KWPOW": {1, 7},
+		"LPAREN": {1, 6},
 	},
 	19: {
-		"$": {2, 1},
-		"COMMA": {2, 1},
-		"DIV": {1, 12},
-		"MINUS": {2, 1},
-		"MOD": {1, 13},
-		"PLUS": {2, 1},
-		"RPAREN": {2, 1},
-		"TIMES": {1, 14},
+		"RPAREN": {1, 30},
 	},
 	20: {
-		"$": {2, 2},
-		"COMMA": {2, 2},
-		"DIV": {1, 12},
-		"MINUS": {2, 2},
-		"MOD": {1, 13},
-		"PLUS": {2, 2},
-		"RPAREN": {2, 2},
-		"TIMES": {1, 14},
+		"COMMA": {2, 18},
+		"MINUS": {1, 17},
+		"PLUS": {1, 16},
+		"RPAREN": {2, 18},
 	},
 	21: {
+		"COMMA": {1, 31},
+		"RPAREN": {2, 16},
+	},
+	22: {
 		"$": {2, 5},
 		"COMMA": {2, 5},
 		"DIV": {2, 5},
@@ -190,7 +184,7 @@ var parserActionTable = map[int]map[string]parserAction{
 		"RPAREN": {2, 5},
 		"TIMES": {2, 5},
 	},
-	22: {
+	23: {
 		"$": {2, 6},
 		"COMMA": {2, 6},
 		"DIV": {2, 6},
@@ -200,7 +194,7 @@ var parserActionTable = map[int]map[string]parserAction{
 		"RPAREN": {2, 6},
 		"TIMES": {2, 6},
 	},
-	23: {
+	24: {
 		"$": {2, 4},
 		"COMMA": {2, 4},
 		"DIV": {2, 4},
@@ -210,35 +204,7 @@ var parserActionTable = map[int]map[string]parserAction{
 		"RPAREN": {2, 4},
 		"TIMES": {2, 4},
 	},
-	24: {
-		"$": {2, 8},
-		"COMMA": {2, 8},
-		"DIV": {2, 8},
-		"MINUS": {2, 8},
-		"MOD": {2, 8},
-		"PLUS": {2, 8},
-		"RPAREN": {2, 8},
-		"TIMES": {2, 8},
-	},
 	25: {
-		"COMMA": {1, 30},
-		"RPAREN": {2, 16},
-	},
-	26: {
-		"RPAREN": {1, 31},
-	},
-	27: {
-		"COMMA": {2, 18},
-		"MINUS": {1, 11},
-		"PLUS": {1, 10},
-		"RPAREN": {2, 18},
-	},
-	28: {
-		"COMMA": {1, 32},
-		"MINUS": {1, 11},
-		"PLUS": {1, 10},
-	},
-	29: {
 		"$": {2, 13},
 		"COMMA": {2, 13},
 		"DIV": {2, 13},
@@ -249,14 +215,42 @@ var parserActionTable = map[int]map[string]parserAction{
 		"RPAREN": {2, 13},
 		"TIMES": {2, 13},
 	},
-	30: {
-		"FLOAT": {1, 6},
-		"IDENT": {1, 7},
-		"INT": {1, 5},
-		"KWPOW": {1, 8},
-		"LPAREN": {1, 9},
+	26: {
+		"COMMA": {1, 32},
+		"MINUS": {1, 17},
+		"PLUS": {1, 16},
 	},
-	31: {
+	27: {
+		"$": {2, 1},
+		"COMMA": {2, 1},
+		"DIV": {1, 11},
+		"MINUS": {2, 1},
+		"MOD": {1, 12},
+		"PLUS": {2, 1},
+		"RPAREN": {2, 1},
+		"TIMES": {1, 13},
+	},
+	28: {
+		"$": {2, 2},
+		"COMMA": {2, 2},
+		"DIV": {1, 11},
+		"MINUS": {2, 2},
+		"MOD": {1, 12},
+		"PLUS": {2, 2},
+		"RPAREN": {2, 2},
+		"TIMES": {1, 13},
+	},
+	29: {
+		"$": {2, 8},
+		"COMMA": {2, 8},
+		"DIV": {2, 8},
+		"MINUS": {2, 8},
+		"MOD": {2, 8},
+		"PLUS": {2, 8},
+		"RPAREN": {2, 8},
+		"TIMES": {2, 8},
+	},
+	30: {
 		"$": {2, 15},
 		"COMMA": {2, 15},
 		"DIV": {2, 15},
@@ -267,22 +261,29 @@ var parserActionTable = map[int]map[string]parserAction{
 		"RPAREN": {2, 15},
 		"TIMES": {2, 15},
 	},
+	31: {
+		"FLOAT": {1, 5},
+		"IDENT": {1, 2},
+		"INT": {1, 1},
+		"KWPOW": {1, 7},
+		"LPAREN": {1, 6},
+	},
 	32: {
-		"FLOAT": {1, 6},
-		"IDENT": {1, 7},
-		"INT": {1, 5},
-		"KWPOW": {1, 8},
-		"LPAREN": {1, 9},
+		"FLOAT": {1, 5},
+		"IDENT": {1, 2},
+		"INT": {1, 1},
+		"KWPOW": {1, 7},
+		"LPAREN": {1, 6},
 	},
 	33: {
 		"COMMA": {2, 19},
-		"MINUS": {1, 11},
-		"PLUS": {1, 10},
+		"MINUS": {1, 17},
+		"PLUS": {1, 16},
 		"RPAREN": {2, 19},
 	},
 	34: {
-		"MINUS": {1, 11},
-		"PLUS": {1, 10},
+		"MINUS": {1, 17},
+		"PLUS": {1, 16},
 		"RPAREN": {1, 35},
 	},
 	35: {
@@ -301,95 +302,95 @@ var parserActionTable = map[int]map[string]parserAction{
 // parserGotoTable[state][nonTerminal] → next state
 var parserGotoTable = map[int]map[string]int{
 	0: {
-		"atom": 4,
-		"expr": 1,
-		"power": 3,
-		"term": 2,
+		"atom": 9,
+		"expr": 8,
+		"power": 4,
+		"term": 3,
 	},
-	9: {
-		"atom": 4,
-		"expr": 18,
-		"power": 3,
-		"term": 2,
+	6: {
+		"atom": 9,
+		"expr": 14,
+		"power": 4,
+		"term": 3,
 	},
 	10: {
-		"atom": 4,
-		"power": 3,
-		"term": 19,
+		"arglist": 21,
+		"args": 19,
+		"atom": 9,
+		"expr": 20,
+		"power": 4,
+		"term": 3,
 	},
 	11: {
-		"atom": 4,
-		"power": 3,
-		"term": 20,
-	},
-	12: {
-		"atom": 4,
-		"power": 21,
-	},
-	13: {
-		"atom": 4,
+		"atom": 9,
 		"power": 22,
 	},
-	14: {
-		"atom": 4,
+	12: {
+		"atom": 9,
 		"power": 23,
 	},
-	15: {
-		"atom": 4,
+	13: {
+		"atom": 9,
 		"power": 24,
 	},
+	15: {
+		"atom": 9,
+		"expr": 26,
+		"power": 4,
+		"term": 3,
+	},
 	16: {
-		"arglist": 25,
-		"args": 26,
-		"atom": 4,
-		"expr": 27,
-		"power": 3,
-		"term": 2,
+		"atom": 9,
+		"power": 4,
+		"term": 27,
 	},
 	17: {
-		"atom": 4,
-		"expr": 28,
-		"power": 3,
-		"term": 2,
+		"atom": 9,
+		"power": 4,
+		"term": 28,
 	},
-	30: {
-		"atom": 4,
+	18: {
+		"atom": 9,
+		"power": 29,
+	},
+	31: {
+		"atom": 9,
 		"expr": 33,
-		"power": 3,
-		"term": 2,
+		"power": 4,
+		"term": 3,
 	},
 	32: {
-		"atom": 4,
+		"atom": 9,
 		"expr": 34,
-		"power": 3,
-		"term": 2,
+		"power": 4,
+		"term": 3,
 	},
 }
 
-// parserProd describes one production: its head symbol and body length.
-type parserProd struct{ head string; bodyLen int }
+// parserProd describes one production: its head symbol, body symbols, and body length.
+type parserProd struct{ head string; body string; bodyLen int }
 
 var parserProds = []parserProd{
-	0: {"expr'", 1},
-	1: {"expr", 3},
-	2: {"expr", 3},
-	3: {"expr", 1},
-	4: {"term", 3},
-	5: {"term", 3},
-	6: {"term", 3},
-	7: {"term", 1},
-	8: {"power", 3},
-	9: {"power", 1},
-	10: {"atom", 1},
-	11: {"atom", 1},
-	12: {"atom", 1},
-	13: {"atom", 3},
-	14: {"atom", 6},
-	15: {"atom", 4},
-	16: {"args", 1},
-	17: {"args", 0},
-	18: {"arglist", 1},
-	19: {"arglist", 3},
+	0: {"expr'", "expr", 1},
+	1: {"expr", "expr PLUS term", 3},
+	2: {"expr", "expr MINUS term", 3},
+	3: {"expr", "term", 1},
+	4: {"term", "term TIMES power", 3},
+	5: {"term", "term DIV power", 3},
+	6: {"term", "term MOD power", 3},
+	7: {"term", "power", 1},
+	8: {"power", "atom POW power", 3},
+	9: {"power", "atom", 1},
+	10: {"atom", "INT", 1},
+	11: {"atom", "FLOAT", 1},
+	12: {"atom", "IDENT", 1},
+	13: {"atom", "LPAREN expr RPAREN", 3},
+	14: {"atom", "KWPOW LPAREN expr COMMA expr RPAREN", 6},
+	15: {"atom", "IDENT LPAREN args RPAREN", 4},
+	16: {"args", "arglist", 1},
+	17: {"args", "ε", 0},
+	18: {"arglist", "expr", 1},
+	19: {"arglist", "arglist COMMA expr", 3},
 }
 
 var parserIgnore = map[int]bool{}
@@ -402,17 +403,23 @@ func Parse(l *Lexer) error {
 	stk := []int{0}
 	peek := func() int { return stk[len(stk)-1] }
 
+	// Symbol stack — tracks the sentential form for derivation display.
+	var symStk []string
+
 	// Fetch the first non-ignored token.
 	var cur Lexeme
 
-	symbolTable := map[string][]Lexeme{}
+	var symbolTable []Lexeme
+	var sententialForms []string
 
 	nextToken := func() {
 		for {
 			cur = l.NextToken()
+
 			if cur.Token != EOF && cur.Token != ERROR {
-				symbolTable[cur.Value] = append(symbolTable[cur.Value], cur)
+				symbolTable = append(symbolTable, cur)
 			}
+
 			if !parserIgnore[cur.Token] {
 				break
 			}
@@ -421,19 +428,31 @@ func Parse(l *Lexer) error {
 	nextToken()
 
 	// Map token ID → terminal name for table look-ups.
-	// The reverse map is built from the constant values embedded in the file.
 	tokName := tokenIDToName()
+
+	fmt.Println("── Parse Actions ──")
 
 	for {
 		state := peek()
+
+		// If we hit an ERROR token from the lexer, immediately fail.
+		if cur.Token == ERROR {
+			return fmt.Errorf(
+				"lexical error: unrecognized input '%s' at line %d, col %d",
+				cur.Value,
+				cur.Line,
+				cur.Col,
+			)
+		}
+
 		sym := "$"
 		if cur.Token != EOF {
 			if name, ok := tokName[cur.Token]; ok {
 				sym = name
 			} else {
 				return fmt.Errorf(
-					"syntax error: unexpected %!s(MISSING) at line %!d(MISSING), col %!d(MISSING)",
-					sym,
+					"syntax error: unexpected token %d at line %d, col %d",
+					cur.Token,
 					cur.Line,
 					cur.Col,
 				)
@@ -442,60 +461,127 @@ func Parse(l *Lexer) error {
 
 		row, ok := parserActionTable[state]
 		if !ok {
-			return fmt.Errorf("line %!d(MISSING) col %!d(MISSING): no actions in state %!d(MISSING) (token %!q(MISSING))",
-				cur.Line, cur.Col, state, sym)
+			return fmt.Errorf(
+				"line %d col %d: no actions in state %d (token %q)",
+				cur.Line,
+				cur.Col,
+				state,
+				sym,
+			)
 		}
+
 		act, ok := row[sym]
 		if !ok {
-			// Collect expected symbols for a helpful message.
-			expected := make([]string, 0, len(row))
-			for s := range row { expected = append(expected, s) }
-			return fmt.Errorf("line %!d(MISSING) col %!d(MISSING): unexpected %!q(MISSING), expected one of %!v(MISSING)",
-				cur.Line, cur.Col, sym, expected)
+			return fmt.Errorf(
+				"syntax error: unexpected %s at line %d, col %d",
+				sym,
+				cur.Line,
+				cur.Col,
+			)
 		}
 
 		switch act.kind {
+
 		case 1: // shift
+			symName := tokenName(cur, tokName)
+			fmt.Printf("Shift:  %s\n", symName)
+			symStk = append(symStk, symName)
 			stk = append(stk, act.arg)
 			nextToken()
 
 		case 2: // reduce
 			prod := parserProds[act.arg]
+			bodyStr := prodBody(act.arg)
+			fmt.Printf("Reduce: %s → %s\n", prod.head, bodyStr)
+
+			// Pop body symbols and push head.
+			if prod.bodyLen > 0 {
+				symStk = symStk[:len(symStk)-prod.bodyLen]
+			}
+			symStk = append(symStk, prod.head)
+
+			// Record the current sentential form.
+			sententialForms = append(sententialForms, joinSymbols(symStk))
+
 			// Pop |body| states off the stack.
 			stk = stk[:len(stk)-prod.bodyLen]
+
 			// Look up Goto[top][head] to find the new state.
 			top := peek()
+
 			gotoRow, ok := parserGotoTable[top]
 			if !ok {
-				return fmt.Errorf("state %!d(MISSING): no goto row (reducing by %!q(MISSING))", top, prod.head)
+				return fmt.Errorf(
+					"state %d: no goto row (reducing by %q)",
+					top,
+					prod.head,
+				)
 			}
+
 			next, ok := gotoRow[prod.head]
 			if !ok {
-				return fmt.Errorf("state %!d(MISSING): no goto for %!q(MISSING)", top, prod.head)
+				return fmt.Errorf(
+					"state %d: no goto for %q",
+					top,
+					prod.head,
+				)
 			}
+
 			stk = append(stk, next)
 
 		case 3: // accept
-			fmt.Println("\n── Tabla de símbolos ──")
-			fmt.Printf("%!s(MISSING) %!s(MISSING) %!s(MISSING)\n", "LEXEMA", "TOKEN", "LÍNEA:COL")
-
-			for lexeme, occs := range symbolTable {
-				for _, occ := range occs {
-					fmt.Printf(
-						"%!s(MISSING) %!d(MISSING) %!d(MISSING):%!d(MISSING)\n",
-						lexeme,
-						occ.Token,
-						occ.Line,
-						occ.Col,
-					)
-				}
+			fmt.Println("\n\n── Sentential Forms (Rightmost Derivation in Reverse) ──")
+			for i, form := range sententialForms {
+				fmt.Printf("%d. %s\n", i+1, form)
 			}
+
+			fmt.Println("\n── Symbol Table ──")
+			fmt.Printf("%-20s %-20s %-10s\n", "LEXEME", "TOKEN", "LINE:COL")
+
+			for _, lex := range symbolTable {
+				tokenStr := tokenName(lex, tokName)
+				fmt.Printf(
+					"%-20s %-20s %d:%d\n",
+					lex.Value,
+					tokenStr,
+					lex.Line,
+					lex.Col,
+				)
+			}
+
 			return nil
+
 		default:
-			return fmt.Errorf("line %!d(MISSING) col %!d(MISSING): parse error (state %!d(MISSING), token %!q(MISSING))",
-				cur.Line, cur.Col, state, sym)
+			return fmt.Errorf(
+				"line %d col %d: parse error (state %d, token %q)",
+				cur.Line,
+				cur.Col,
+				state,
+				sym,
+			)
 		}
 	}
+}
+
+func tokenName(lex Lexeme, tokName map[int]string) string {
+	if lex.Token == EOF {
+		return "$"
+	}
+	if name, ok := tokName[lex.Token]; ok {
+		return name
+	}
+	return fmt.Sprintf("TOKEN%d", lex.Token)
+}
+
+func prodBody(idx int) string {
+	return parserProds[idx].body
+}
+
+func joinSymbols(syms []string) string {
+	if len(syms) == 0 {
+		return "ε"
+	}
+	return strings.Join(syms, " ")
 }
 
 // tokenIDToName returns a map from token integer ID to its grammar name.
@@ -525,7 +611,10 @@ func main() {
 		os.Exit(1)
 	}
 	data, err := os.ReadFile(os.Args[1])
-	if err != nil { fmt.Fprintln(os.Stderr, err); os.Exit(1) }
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 	l := NewArithmeticLexer(string(data))
 	if err := Parse(l); err != nil {
 		fmt.Fprintln(os.Stderr, "parse error:", err)

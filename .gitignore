@@ -17,5 +17,9 @@ frontend/package.json.md5
 workspace/lexers/*.dfa
 workspace/lexers/*.go
 workspace/output/
-
-workspace/lexers/*
+workspace/programs/arithmetic/arithmetic
+workspace/programs/calc/calc
+workspace/programs/gol/gol
+workspace/programs/*/lexer
+workspace/programs/*/parser
+workspace/programs/*/*.out

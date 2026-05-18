@@ -137,12 +137,20 @@ func Parse(l *Lexer) error {
 
 	// Fetch the first non-ignored token.
 	var cur Lexeme
+
+	symbolTable := map[string][]Lexeme{}
+
 	nextToken := func() {
 		for {
 			cur = l.NextToken()
+
 			if cur.Token != EOF && cur.Token != ERROR {
-				symbolTable[cur.Value] = append(symbolTable[cur.Value], cur)
+				symbolTable[cur.Value] = append(
+					symbolTable[cur.Value],
+					cur,
+				)
 			}
+
 			if !parserIgnore[cur.Token] {
 				break
 			}
@@ -151,20 +159,19 @@ func Parse(l *Lexer) error {
 	nextToken()
 
 	// Map token ID → terminal name for table look-ups.
-	// The reverse map is built from the constant values embedded in the file.
 	tokName := tokenIDToName()
-	symbolTable := map[string][]Lexeme{}
 
 	for {
 		state := peek()
+
 		sym := "$"
 		if cur.Token != EOF {
 			if name, ok := tokName[cur.Token]; ok {
 				sym = name
 			} else {
 				return fmt.Errorf(
-					"syntax error: unexpected %s at line %d, col %d",
-					sym,
+					"syntax error: unexpected %%d at line %%d, col %%d",
+					cur.Token,
 					cur.Line,
 					cur.Col,
 				)
@@ -173,47 +180,68 @@ func Parse(l *Lexer) error {
 
 		row, ok := parserActionTable[state]
 		if !ok {
-			return fmt.Errorf("line %d col %d: no actions in state %d (token %q)",
-				cur.Line, cur.Col, state, sym)
+			return fmt.Errorf(
+				"line %%d col %%d: no actions in state %%d (token %%q)",
+				cur.Line,
+				cur.Col,
+				state,
+				sym,
+			)
 		}
+
 		act, ok := row[sym]
 		if !ok {
-			// Collect expected symbols for a helpful message.
-			expected := make([]string, 0, len(row))
-			for s := range row { expected = append(expected, s) }
-			return fmt.Errorf("line %d col %d: unexpected %q, expected one of %v",
-				cur.Line, cur.Col, sym, expected)
+			return fmt.Errorf(
+				"syntax error: unexpected %%s at line %%d, col %%d",
+				sym,
+				cur.Line,
+				cur.Col,
+			)
 		}
 
 		switch act.kind {
+
 		case 1: // shift
 			stk = append(stk, act.arg)
 			nextToken()
 
 		case 2: // reduce
 			prod := parserProds[act.arg]
+
 			// Pop |body| states off the stack.
 			stk = stk[:len(stk)-prod.bodyLen]
+
 			// Look up Goto[top][head] to find the new state.
 			top := peek()
+
 			gotoRow, ok := parserGotoTable[top]
 			if !ok {
-				return fmt.Errorf("state %d: no goto row (reducing by %q)", top, prod.head)
+				return fmt.Errorf(
+					"state %%d: no goto row (reducing by %%q)",
+					top,
+					prod.head,
+				)
 			}
+
 			next, ok := gotoRow[prod.head]
 			if !ok {
-				return fmt.Errorf("state %d: no goto for %q", top, prod.head)
+				return fmt.Errorf(
+					"state %%d: no goto for %%q",
+					top,
+					prod.head,
+				)
 			}
+
 			stk = append(stk, next)
 
 		case 3: // accept
 			fmt.Println("\n── Tabla de símbolos ──")
-			fmt.Printf("%-20s %-10s %s\n", "LEXEMA", "TOKEN", "LÍNEA:COL")
+			fmt.Printf("%%-20s %%-10s %%s\n", "LEXEMA", "TOKEN", "LÍNEA:COL")
 
 			for lexeme, occs := range symbolTable {
 				for _, occ := range occs {
 					fmt.Printf(
-						"%-20s %-10d %d:%d\n",
+						"%%-20s %%-10d %%d:%%d\n",
 						lexeme,
 						occ.Token,
 						occ.Line,
@@ -221,16 +249,22 @@ func Parse(l *Lexer) error {
 					)
 				}
 			}
+
 			return nil
+
 		default:
-			return fmt.Errorf("line %d col %d: parse error (state %d, token %q)",
-				cur.Line, cur.Col, state, sym)
+			return fmt.Errorf(
+				"line %%d col %%d: parse error (state %%d, token %%q)",
+				cur.Line,
+				cur.Col,
+				state,
+				sym,
+			)
 		}
 	}
 }
 
 `)
-
 	// TOKENIDTONAME() HELPER
 	// Builds the reverse map at runtime from the constants in the same package.
 	// We emit the map literal directly so no reflection is needed.
@@ -264,27 +298,31 @@ func Parse(l *Lexer) error {
 // Lexer, NextToken, Parse, etc.) in the same package main file.
 func GenerateCombinedMain(name string) string {
 	exportedName := capitalize(name)
+
 	var b strings.Builder
-	w := func(format string, args ...any) { fmt.Fprintf(&b, format, args...) }
+	w := func(format string, args ...any) {
+		fmt.Fprintf(&b, format, args...)
+	}
 
-// 	w(`import (
-// 	"fmt"
-// 	"os"
-// )
-
-// `)
 	w("func main() {\n")
 	w("\tif len(os.Args) < 2 {\n")
 	w("\t\tfmt.Fprintln(os.Stderr, \"usage: %s <inputfile>\")\n", name)
 	w("\t\tos.Exit(1)\n")
 	w("\t}\n")
+
 	w("\tdata, err := os.ReadFile(os.Args[1])\n")
-	w("\tif err != nil { fmt.Fprintln(os.Stderr, err); os.Exit(1) }\n")
+	w("\tif err != nil {\n")
+	w("\t\tfmt.Fprintln(os.Stderr, err)\n")
+	w("\t\tos.Exit(1)\n")
+	w("\t}\n")
+
 	w("\tl := New%sLexer(string(data))\n", exportedName)
+
 	w("\tif err := Parse(l); err != nil {\n")
 	w("\t\tfmt.Fprintln(os.Stderr, \"parse error:\", err)\n")
 	w("\t\tos.Exit(1)\n")
 	w("\t}\n")
+
 	w("\tfmt.Println(\"OK — input accepted by the grammar.\")\n")
 	w("}\n")
 

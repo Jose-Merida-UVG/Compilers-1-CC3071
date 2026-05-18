@@ -404,6 +404,9 @@ func Parse(l *Lexer) error {
 
 	// Fetch the first non-ignored token.
 	var cur Lexeme
+
+	symbolTable := map[string][]Lexeme{}
+
 	nextToken := func() {
 		for {
 			cur = l.NextToken()
@@ -420,7 +423,6 @@ func Parse(l *Lexer) error {
 	// Map token ID → terminal name for table look-ups.
 	// The reverse map is built from the constant values embedded in the file.
 	tokName := tokenIDToName()
-	symbolTable := map[string][]Lexeme{}
 
 	for {
 		state := peek()

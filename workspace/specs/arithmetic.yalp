@@ -17,8 +17,19 @@
 %token PLUS MINUS TIMES DIV MOD
 %token LPAREN RPAREN COMMA
 %token IDENT
+%token NEWLINE
 
 %%
+
+input:
+    input line
+  | line
+;
+
+line:
+    expr NEWLINE
+  | expr
+;
 
 expr:
     expr PLUS term
@@ -44,12 +55,8 @@ atom:
   | IDENT
   | LPAREN expr RPAREN
   | KWPOW LPAREN expr COMMA expr RPAREN
-  | IDENT LPAREN args RPAREN
-;
-
-args:
-    arglist
-  | /* empty */
+  | IDENT LPAREN RPAREN
+  | IDENT LPAREN arglist RPAREN
 ;
 
 arglist:

@@ -263,19 +263,15 @@ func (h *apiHandler) getDFA(w http.ResponseWriter, r *http.Request) {
 	serialized := graph.SerializeDFA(compiled.DFA)
 
 	specBase := strings.TrimSuffix(filepath.Base(body.Path), ".yal")
-	lexerDir := filepath.Join(h.workspace, "programs", specBase, "lexer")
+	programDir := filepath.Join(h.workspace, "programs", specBase)
 	docsDir  := filepath.Join(h.workspace, "programs", specBase, "docs")
-	os.MkdirAll(lexerDir, 0o755)
+	os.MkdirAll(programDir, 0o755)
 	os.MkdirAll(docsDir, 0o755)
 
 	// Write DFA graph JSON to docs/ for the frontend visualizer.
 	if dfaJSON, err := json.Marshal(serialized); err == nil {
 		os.WriteFile(filepath.Join(docsDir, "dfa.json"), dfaJSON, 0o644)
 	}
-
-	// Write lexer.go to lexer/.
-	goSrc := codegen.GenerateLexer(specBase, yalFile, compiled.DFA, compiled.Actions)
-	os.WriteFile(filepath.Join(lexerDir, "lexer.go"), []byte(goSrc), 0o644)
 
 	writeJSON(w, serialized)
 }
@@ -309,7 +305,33 @@ func (h *apiHandler) buildParser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	specBase := strings.TrimSuffix(filepath.Base(body.YalpPath), ".yalp")
+	ignoreSet := map[string]bool{}
+
+	for _, tok := range yalpFile.IgnoreList {
+		ignoreSet[tok] = true
+	}
+
+	for _, prod := range yalpFile.Productions {
+		for _, rule := range prod.Rules {
+			for _, sym := range rule {
+				if ignoreSet[sym] {
+					writeError(
+						w,
+						http.StatusUnprocessableEntity,
+						fmt.Sprintf(
+							"token %q is IGNORE but used in production %q",
+							sym,
+							prod.Name,
+						),
+					)
+					return
+				}
+			}
+		}
+	}
+
+specBase := strings.TrimSuffix(filepath.Base(body.YalpPath), ".yalp")
+
 
 	// Build the lexer from the matching .yal spec (same name convention, mirrors -l flag).
 	yalFull, err := h.resolve(filepath.Join(filepath.Dir(body.YalpPath), specBase+".yal"))
@@ -333,11 +355,32 @@ func (h *apiHandler) buildParser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	lexerDir := filepath.Join(h.workspace, "programs", specBase, "lexer")
-	parserDir := filepath.Join(h.workspace, "programs", specBase, "parser")
+	returned := map[string]bool{}
+
+	for _, action := range compiledLexer.Actions {
+		fields := strings.Fields(action)
+
+		for i := 0; i < len(fields)-1; i++ {
+			if fields[i] == "return" {
+				returned[fields[i+1]] = true
+			}
+		}
+	}
+
+	for _, tok := range yalpFile.Tokens {
+		if !returned[tok.Name] {
+			fmt.Printf(
+				"warning: token %q declared in .yalp but never returned by lexer\n",
+				tok.Name,
+			)
+		}
+	}
+
+	// lexerDir := filepath.Join(h.workspace, "programs", specBase, "lexer")
+	programDir := filepath.Join(h.workspace, "programs", specBase)
 	docsDir   := filepath.Join(h.workspace, "programs", specBase, "docs")
-	os.MkdirAll(lexerDir, 0o755)
-	os.MkdirAll(parserDir, 0o755)
+	// os.MkdirAll(lexerDir, 0o755)
+	os.MkdirAll(programDir, 0o755)
 	os.MkdirAll(docsDir, 0o755)
 
 	// Write the standalone lexer (for Build Lexer / Run without parser).
@@ -382,7 +425,7 @@ func (h *apiHandler) buildParser(w http.ResponseWriter, r *http.Request) {
 
 	// Write lexer.go.
 	os.WriteFile(
-		filepath.Join(lexerDir, "lexer.go"),
+		filepath.Join(programDir, "lexer.go"),
 		[]byte(combinedLexer),
 		0o644,
 	)
@@ -395,16 +438,17 @@ func (h *apiHandler) buildParser(w http.ResponseWriter, r *http.Request) {
 		Table:     compiled.Table,
 	})
 
+
 	// Append generated main().
 	parserSrc += "\n\n" + codegen.GenerateCombinedMain(specBase)
+	
 
 	// Write parser.go.
 	os.WriteFile(
-		filepath.Join(parserDir, "parser.go"),
+		filepath.Join(programDir, "parser.go"),
 		[]byte(parserSrc),
 		0o644,
 	)
-
 
 	// Build structured SLR table data for the frontend viewer.
 	terminals := sortedStringKeys(compiled.Grammar.Terminals)
@@ -502,17 +546,20 @@ func (h *apiHandler) runFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Collect .go files from lexer/ and parser/ subdirectories.
+	dir := filepath.Join(h.workspace, "programs", ext)
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		writeError(w, http.StatusNotFound,
+			fmt.Sprintf("no program found for %q", ext))
+		return
+	}
+
 	var goFiles []string
-	for _, sub := range []string{"lexer", "parser"} {
-		dir := filepath.Join(h.workspace, "programs", ext, sub)
-		entries, err := os.ReadDir(dir)
-		if err != nil {
-			continue // subdirectory may not exist yet
-		}
-		for _, e := range entries {
-			if !e.IsDir() && strings.HasSuffix(e.Name(), ".go") {
-				goFiles = append(goFiles, filepath.Join(dir, e.Name()))
-			}
+
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".go") {
+			goFiles = append(goFiles, filepath.Join(dir, e.Name()))
 		}
 	}
 	if len(goFiles) == 0 {

@@ -284,7 +284,9 @@ func GenerateCombined(name string, yf *yalex.YalFile, dfa *automata.DFA, actions
 	w := func(format string, args ...any) { fmt.Fprintf(&b, format, args...) }
 
 	w("package main\n\n")
-	w("import (\n\t\"fmt\"\n\t\"os\"\n)\n\n")
+	// "fmt" is used by the scan loop; "os" is not needed here —
+	// main() lives in parser.go (produced by GenerateParser).
+	w("import \"fmt\"\n\n")
 
 	// YAPar owns the token constants — emit them here so lexer actions can return them.
 	w("const (\n")
@@ -391,29 +393,10 @@ func GenerateCombined(name string, yf *yalex.YalFile, dfa *automata.DFA, actions
 	w("func (l *Lexer) NextToken() Lexeme {\n")
 	w("\ttok := l.%s()\n", scanName)
 	w("\treturn Lexeme{Token: tok, Value: l.Lxm, Line: l.Ln, Col: l.Col}\n")
-	w("}\n\n")
+	w("}\n")
 
-	// Placeholder main — will be replaced by the parser entry point once parser
-	// codegen is implemented. For now it lets the file compile and run standalone.
-	w(`func main() {
-	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: %s <inputfile>")
-		os.Exit(1)
-	}
-	data, err := os.ReadFile(os.Args[1])
-	if err != nil { fmt.Fprintln(os.Stderr, err); os.Exit(1) }
-	l := New%sLexer(string(data))
-	for {
-		tok := l.NextToken()
-		if tok.Token == EOF { break }
-		if tok.Token == ERROR {
-			fmt.Printf("ERROR  %%-20q  ln=%%d col=%%d\n", tok.Value, tok.Line, tok.Col)
-			continue
-		}
-		fmt.Printf("%%d  %%-20q  ln=%%d col=%%d\n", tok.Token, tok.Value, tok.Line)
-	}
-}
-`, name, exportedName)
+	// No main() here — parser.go (produced by GenerateParser) owns main() so
+	// that the two files form a single package main binary together.
 
 	return b.String()
 }

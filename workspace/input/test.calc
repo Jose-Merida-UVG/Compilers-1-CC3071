@@ -1,1 +1,13 @@
-let x = if 0xFF > 100 && 3.14 < 5.0 else 42
+let x = 10;
+let y = 20;
+let sum = x + y;
+let isPositive = sum > 0;
+let isBig = sum >= 100 || isPositive && true;
+x += 5;
+y *= 2;
+if isBig (
+    let result = 999;
+) else (
+    let result = sum / 2;
+)
+let final = x + y * 3;

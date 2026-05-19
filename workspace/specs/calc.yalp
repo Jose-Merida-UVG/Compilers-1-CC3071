@@ -1,18 +1,26 @@
-/* calc.yalp — imperative language with type-safe grammar.
+/* calc.yalp - simple imperative language.
 
-   TYPE ENFORCEMENT AT PARSE TIME:
-   - numexpr: numeric expressions (INT, FLOAT, HEX, arithmetic)
-   - boolexpr: boolean expressions (TRUE, FALSE, logic, comparisons)
+   Statements end in ';'. Blocks ALWAYS use parens ( stmts ).
+   No bare single-stmt shorthand - keeps grammar SLR(1) (no dangling-else).
 
-   The grammar enforces:
-   - Arithmetic operators (+, -, *, /, %, **) only work on numbers
-   - Logical operators (&&, ||, !) only work on booleans
-   - Comparisons (<, >, <=, >=) take numbers, produce booleans
-   - Control flow (if, while) requires boolean conditions
+   Expr precedence (low to high):
+     ||            OR,  left-assoc
+     &&            AND, left-assoc
+     !             NOT, right-assoc prefix
+     == != < <= > >=  comparison, non-associative
+     + -           additive,       left-assoc
+     * / %         multiplicative, left-assoc
+     **            power,          right-assoc
+     - (unary)     unary minus, prefix
+     atom          base case
 
-   Limitation: Variables (IDENT) can appear in both contexts since we
-   don't track types at parse time. Runtime would still need to check
-   that number variables aren't used in boolean context and vice versa.
+   YES: let x = expr;  x = expr;  x += expr (-= *= /=)
+        if expr ( stmts )
+        if expr ( stmts ) else ( stmts )
+        while expr ( stmts )
+        expr;  true/false  0xFF  3.14  -x  (expr)
+   NO:  f(a,b) - no function calls (conflicts with block parens in SLR1)
+        braces { },  for,  func,  strings,  x++ x--,  decl without value
 */
 
 %token FLOAT INT HEX
@@ -20,109 +28,99 @@
 %token PLUS MINUS TIMES DIV MOD POW
 %token EQ NEQ LT LEQ GT GEQ
 %token AND OR NOT
-%token LPAREN RPAREN COMMA SEMI
+%token LPAREN RPAREN SEMI
 %token ASSN KWLET KWIF KWELSE WHILE
 %token PLEQ MIEQ TIEQ DIEQ
 %token IDENT
 
 %%
 
-program:
+program:                     /* a file is a sequence of statements */
     stmts
 ;
 
-stmts:
+stmts:                       /* one or more stmts, left-recursive */
     stmts stmt
   | stmt
 ;
 
 stmt:
-    KWLET IDENT ASSN numexpr SEMI
-  | KWLET IDENT ASSN boolexpr SEMI
-  | IDENT ASSN numexpr SEMI
-  | IDENT ASSN boolexpr SEMI
-  | IDENT PLEQ numexpr SEMI
-  | IDENT MIEQ numexpr SEMI
-  | IDENT TIEQ numexpr SEMI
-  | IDENT DIEQ numexpr SEMI
-  | KWIF boolexpr stmtblock
-  | KWIF boolexpr stmtblock KWELSE stmtblock
-  | WHILE boolexpr stmtblock
-  | numexpr SEMI
-  | boolexpr SEMI
+    KWLET IDENT ASSN expr SEMI            /* let x = expr; */
+  | IDENT ASSN expr SEMI                 /* x = expr; */
+  | IDENT PLEQ expr SEMI                 /* x += expr; */
+  | IDENT MIEQ expr SEMI                 /* x -= expr; */
+  | IDENT TIEQ expr SEMI                 /* x *= expr; */
+  | IDENT DIEQ expr SEMI                 /* x /= expr; */
+  | KWIF expr stmtblock                  /* if expr ( stmts ) */
+  | KWIF expr stmtblock KWELSE stmtblock /* if expr ( stmts ) else ( stmts ) */
+  | WHILE expr stmtblock                 /* while expr ( stmts ) */
+  | expr SEMI                            /* f(x); - expression as statement */
 ;
 
-stmtblock:
-    stmt
-  | LPAREN stmts RPAREN
+stmtblock:                   /* block body: ALWAYS ( stmts ) */
+    LPAREN stmts RPAREN
 ;
 
-/* ── Numeric Expressions ────────────────────────────────────────── */
-
-numexpr:
-    numexpr PLUS numterm
-  | numexpr MINUS numterm
-  | numterm
+expr:
+    orexpr
 ;
 
-numterm:
-    numterm TIMES numfactor
-  | numterm DIV numfactor
-  | numterm MOD numfactor
-  | numfactor
+orexpr:                      /* ||, left-assoc */
+    orexpr OR andexpr
+  | andexpr
 ;
 
-numfactor:
-    numprimary POW numfactor
-  | numprimary
+andexpr:                     /* &&, left-assoc */
+    andexpr AND notexpr
+  | notexpr
 ;
 
-numprimary:
+notexpr:                     /* !, prefix, right-assoc */
+    NOT notexpr
+  | cmpexpr
+;
+
+cmpexpr:                     /* comparison, non-associative */
+    addexpr EQ  addexpr      /* == */
+  | addexpr NEQ addexpr      /* != */
+  | addexpr LT  addexpr      /* < */
+  | addexpr LEQ addexpr      /* <= */
+  | addexpr GT  addexpr      /* > */
+  | addexpr GEQ addexpr      /* >= */
+  | addexpr
+;
+
+addexpr:                     /* + -, left-assoc */
+    addexpr PLUS  mulexpr
+  | addexpr MINUS mulexpr
+  | mulexpr
+;
+
+mulexpr:                     /* * / %, left-assoc */
+    mulexpr TIMES powexpr
+  | mulexpr DIV   powexpr
+  | mulexpr MOD   powexpr
+  | powexpr
+;
+
+powexpr:                     /* **, right-assoc: a**b**c = a**(b**c) */
+    unary POW powexpr
+  | unary
+;
+
+unary:                       /* unary minus, prefix */
+    MINUS unary
+  | atom
+;
+
+atom:
     INT
   | FLOAT
-  | HEX
-  | IDENT
-  | MINUS numprimary
-  | LPAREN numexpr RPAREN
-  | IDENT LPAREN numargs RPAREN
-;
-
-numargs:
-    numarglist
-  | /* empty */
-;
-
-numarglist:
-    numexpr
-  | numarglist COMMA numexpr
-;
-
-/* ── Boolean Expressions ────────────────────────────────────────── */
-
-boolexpr:
-    boolexpr OR boolterm
-  | boolterm
-;
-
-boolterm:
-    boolterm AND boolfactor
-  | boolfactor
-;
-
-boolfactor:
-    NOT boolfactor
-  | boolprimary
-;
-
-boolprimary:
-    KWTRUE
+  | HEX                      /* 0xFF */
+  | KWTRUE
   | KWFALSE
   | IDENT
-  | numexpr EQ numexpr
-  | numexpr NEQ numexpr
-  | numexpr LT numexpr
-  | numexpr LEQ numexpr
-  | numexpr GT numexpr
-  | numexpr GEQ numexpr
-  | LPAREN boolexpr RPAREN
+  | LPAREN expr RPAREN       /* (expr) - grouping only, NOT a block */
 ;
+/* Note: no function call syntax - IDENT LPAREN args RPAREN would conflict
+   with stmtblock -> LPAREN stmts RPAREN via FOLLOW(expr). */

@@ -1,0 +1,16 @@
+\contentsline {section}{\numberline {1}Descripción General}{2}{section.1}%
+\contentsline {section}{\numberline {2}Estructura del Proyecto}{2}{section.2}%
+\contentsline {section}{\numberline {3}Formato del Archivo \texttt {.yalp}}{2}{section.3}%
+\contentsline {section}{\numberline {4}Conexión con YALex}{3}{section.4}%
+\contentsline {section}{\numberline {5}Pipeline de YAPar}{3}{section.5}%
+\contentsline {subsection}{\numberline {5.1}Construcción de la gramática}{3}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Conjuntos FIRST y FOLLOW}{3}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}Autómata LR(0)}{3}{subsection.5.3}%
+\contentsline {subsection}{\numberline {5.4}Tabla SLR(1)}{4}{subsection.5.4}%
+\contentsline {subsection}{\numberline {5.5}Generación de código}{4}{subsection.5.5}%
+\contentsline {section}{\numberline {6}Pipeline de YALex}{4}{section.6}%
+\contentsline {subsection}{\numberline {6.1}Regex a árbol sintáctico}{4}{subsection.6.1}%
+\contentsline {subsection}{\numberline {6.2}Construcción directa del DFA y followpos}{5}{subsection.6.2}%
+\contentsline {subsection}{\numberline {6.3}Minimización y merge}{5}{subsection.6.3}%
+\contentsline {section}{\numberline {7}Salida del Parser Generado}{5}{section.7}%
+\contentsline {section}{\numberline {8}API REST}{5}{section.8}%

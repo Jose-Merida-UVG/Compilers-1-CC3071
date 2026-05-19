@@ -1,18 +1,28 @@
-/* gol.yalp — mini-Go. Usa los tokens de gol.yal.
-   Soporta: package, import, func, var, const, if/else, for, return,
-   llamadas a función, acceso a campos, indexación, expresiones completas.
+/* gol.yalp - subset of Go.
 
-   BADLIT y ARROW están en el lexer pero no en esta gramática (advertencia R1).
+   program -> package IDENT ; imports topdecls
+   Blocks use braces { }. All statements end in ';'.
 
-   Estructura:
-     program → package_clause SEMI imports topdecls
-     topdecl → funcdecl | vardecl | constdecl
-     funcdecl → func name(params) [type] block
-     stmt → vardecl | shortdecl | assign | call | if | for | return | inc/dec
-     expr → precedencia completa con postfix (call, index, field)
+   Expr precedence (low to high):
+     ||            OR,  left-assoc
+     &&            AND, left-assoc
+     == != < <= > >=  comparison, non-associative
+     + -           additive,       left-assoc
+     * / % & |     multiplicative + bitwise, left-assoc
+     unary         ! - * & prefix
+     postfix       f(args)  a[i]  a.b  (chainable)
+     primary       literal, ident, (expr)
+
+   YES: package/import, func with params and return type, var, const,
+        := (short define), += -= *= /=, expr++ expr--,
+        if/else/else-if, for expr { }, for { }, return,
+        !x -x *x &x (unary), true/false/nil, INT/FLOAT/HEX
+   NO:  strings, multiple imports, receiver methods,
+        type/struct with body, multiple assignment,
+        go/defer/select/switch
 */
 
-%token INT FLOAT HEX BADLIT
+%token INT FLOAT HEX
 %token KWPACKAGE KWIMPORT KWFUNC KWVAR KWCONST KWTYPE KWSTRUCT
 %token KWIF KWELSE KWFOR KWRETURN
 %token KWTRUE KWFALSE KWNIL
@@ -27,24 +37,24 @@
 
 %%
 
-program:
+program:                     /* mandatory structure: package, imports, top decls */
     package_clause SEMI imports topdecls
 ;
 
-package_clause:
+package_clause:              /* package main */
     KWPACKAGE IDENT
 ;
 
-imports:
-    imports import_decl
+imports:                     /* zero or more imports, left-recursive */
+    imports import_decl      /* import fmt; import os; - one per line */
   | /* empty */
 ;
 
-import_decl:
+import_decl:                 /* import IDENT ; - identifiers only, no strings */
     KWIMPORT IDENT SEMI
 ;
 
-topdecls:
+topdecls:                    /* zero or more top-level declarations */
     topdecls topdecl
   | /* empty */
 ;
@@ -56,97 +66,97 @@ topdecl:
 ;
 
 funcdecl:
-    KWFUNC IDENT LPAREN params RPAREN block
-  | KWFUNC IDENT LPAREN params RPAREN type block
+    KWFUNC IDENT LPAREN params RPAREN block           /* func f(x int) { } */
+  | KWFUNC IDENT LPAREN params RPAREN type block      /* func f(x int) int { } */
 ;
 
-params:
+params:                      /* parameter list, may be empty */
     paramlist
-  | /* empty */
+  | /* empty */              /* func f() { } */
 ;
 
-paramlist:
+paramlist:                   /* one or more params separated by comma */
     param
   | paramlist COMMA param
 ;
 
-param:
+param:                       /* name type - e.g. x int, p *Node */
     IDENT type
 ;
 
-type:
-    IDENT
-  | TIMES IDENT
-  | LBRACK RBRACK IDENT
+type:                        /* supported types */
+    IDENT                    /* int, float64, MyType */
+  | TIMES IDENT              /* *int - pointer */
+  | LBRACK RBRACK IDENT      /* []int - slice */
 ;
 
 vardecl:
-    KWVAR IDENT type SEMI
-  | KWVAR IDENT type ASSN expr SEMI
-  | KWVAR IDENT ASSN expr SEMI
+    KWVAR IDENT type SEMI            /* var x int; */
+  | KWVAR IDENT type ASSN expr SEMI  /* var x int = 5; */
+  | KWVAR IDENT ASSN expr SEMI       /* var x = 5; - inferred type */
 ;
 
 constdecl:
-    KWCONST IDENT ASSN expr SEMI
-  | KWCONST IDENT type ASSN expr SEMI
+    KWCONST IDENT ASSN expr SEMI          /* const x = 5; */
+  | KWCONST IDENT type ASSN expr SEMI     /* const x int = 5; */
 ;
 
-block:
+block:                       /* { stmts } - body for func, if, for */
     LBRACE stmts RBRACE
 ;
 
-stmts:
+stmts:                       /* zero or more statements inside a block */
     stmts stmt
   | /* empty */
 ;
 
 stmt:
-    vardecl
-  | IDENT DEFINE expr SEMI
-  | IDENT ASSN expr SEMI
-  | IDENT PLEQ expr SEMI
-  | IDENT MIEQ expr SEMI
-  | IDENT TIEQ expr SEMI
-  | IDENT DIEQ expr SEMI
-  | expr INC SEMI
-  | expr DEC SEMI
-  | expr SEMI
+    vardecl                          /* var x int; inside a block */
+  | IDENT DEFINE expr SEMI           /* x := expr; - short define */
+  | IDENT ASSN expr SEMI             /* x = expr; */
+  | IDENT PLEQ expr SEMI             /* x += expr; */
+  | IDENT MIEQ expr SEMI             /* x -= expr; */
+  | IDENT TIEQ expr SEMI             /* x *= expr; */
+  | IDENT DIEQ expr SEMI             /* x /= expr; */
+  | expr INC SEMI                    /* x++; - postfix on any expr */
+  | expr DEC SEMI                    /* x--; */
+  | expr SEMI                        /* f(x); - call as statement */
   | if_stmt
   | for_stmt
   | return_stmt
 ;
 
 if_stmt:
-    KWIF expr block
-  | KWIF expr block KWELSE block
-  | KWIF expr block KWELSE if_stmt
+    KWIF expr block                        /* if x > 0 { } */
+  | KWIF expr block KWELSE block           /* if x > 0 { } else { } */
+  | KWIF expr block KWELSE if_stmt         /* if ... else if ... else if ... */
 ;
 
 for_stmt:
-    KWFOR block
-  | KWFOR expr block
+    KWFOR block                      /* for { } - infinite loop */
+  | KWFOR expr block                 /* for n > 0 { } - with condition */
 ;
 
 return_stmt:
-    KWRETURN SEMI
-  | KWRETURN expr SEMI
+    KWRETURN SEMI                    /* return; */
+  | KWRETURN expr SEMI               /* return x; */
 ;
 
 expr:
     orexpr
 ;
 
-orexpr:
+orexpr:                      /* ||, left-assoc */
     orexpr OR andexpr
   | andexpr
 ;
 
-andexpr:
+andexpr:                     /* &&, left-assoc */
     andexpr AND cmpexpr
   | cmpexpr
 ;
 
-cmpexpr:
+cmpexpr:                     /* comparison, non-associative */
     addexpr EQ  addexpr
   | addexpr NEQ addexpr
   | addexpr LT  addexpr
@@ -156,40 +166,40 @@ cmpexpr:
   | addexpr
 ;
 
-addexpr:
+addexpr:                     /* + -, left-assoc */
     addexpr PLUS  mulexpr
   | addexpr MINUS mulexpr
   | mulexpr
 ;
 
-mulexpr:
+mulexpr:                     /* * / % & |, left-assoc */
     mulexpr TIMES unary
   | mulexpr DIV   unary
   | mulexpr MOD   unary
-  | mulexpr AMP   unary
-  | mulexpr PIPE  unary
+  | mulexpr AMP   unary      /* & bitwise */
+  | mulexpr PIPE  unary      /* | bitwise */
   | unary
 ;
 
-unary:
-    NOT    unary
-  | MINUS  unary
-  | TIMES  unary
-  | AMP    unary
+unary:                       /* prefix operators */
+    NOT   unary              /* !x */
+  | MINUS unary              /* -x */
+  | TIMES unary              /* *x - dereference */
+  | AMP   unary              /* &x - address-of */
   | postfix
 ;
 
-postfix:
+postfix:                     /* chainable postfix operators */
     primary
-  | postfix DOT IDENT
-  | postfix LBRACK expr RBRACK
-  | postfix LPAREN args RPAREN
+  | postfix DOT IDENT        /* a.b - field access */
+  | postfix LBRACK expr RBRACK  /* a[i] - indexing */
+  | postfix LPAREN args RPAREN  /* f(x,y) - call; also postfix()(args) */
 ;
 
 primary:
     INT
   | FLOAT
-  | HEX
+  | HEX                      /* 0xFF */
   | KWTRUE
   | KWFALSE
   | KWNIL

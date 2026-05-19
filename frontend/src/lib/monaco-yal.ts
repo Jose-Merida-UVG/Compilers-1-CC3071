@@ -60,20 +60,21 @@ export function registerYALPLanguage(monaco: typeof Monaco) {
       root: [
         // Block comments /* ... */
         [/\/\*/, "comment", "@comment"],
-        // %token directive
-        [/%token/, "keyword"],
-        // IGNORE keyword
-        [/\bIGNORE\b/, "keyword"],
-        // %% separator
-        [/%%/, "operator"],
-        // Token names (UPPERCASE)
-        [/\b[A-Z][A-Z0-9_]*\b/, "type"],
-        // Non-terminal names (lowercase)
-        [/\b[a-z][a-z0-9_]*\b/, "identifier"],
-        // Production punctuation
-        [/[:|;]/, "operator"],
-        // Pipe (alternate)
-        [/\|/, "operator"],
+        // %% section separator — own style
+        [/%%/, "separator"],
+        // Directives
+        [/%token/, "directive"],
+        [/\bIGNORE\b/, "directive"],
+        // Token names (UPPERCASE) — terminals
+        [/\b[A-Z][A-Z0-9_]*\b/, "terminal"],
+        // Production head: non-terminal immediately followed by :
+        [/\b[a-z][a-z0-9_]*(?=\s*:)/, "prodhead"],
+        // Non-terminal names in body (lowercase)
+        [/\b[a-z][a-z0-9_]*\b/, "nonterminal"],
+        // Semicolon ends a production
+        [/;/, "endrule"],
+        // Colon and pipe
+        [/[:|]/, "operator"],
         [/\s+/, "white"],
       ],
       comment: [
@@ -93,11 +94,14 @@ export function registerYALPLanguage(monaco: typeof Monaco) {
     base: "vs-dark",
     inherit: true,
     rules: [
-      { token: "keyword",    foreground: "c792ea", fontStyle: "bold" },
-      { token: "comment",    foreground: "546e7a", fontStyle: "italic" },
-      { token: "type",       foreground: "f78c6c", fontStyle: "bold" }, // token names
-      { token: "operator",   foreground: "89ddff" },
-      { token: "identifier", foreground: "82aaff" },                    // non-terminals
+      { token: "directive",   foreground: "c792ea", fontStyle: "bold" },
+      { token: "separator",   foreground: "f07178", fontStyle: "bold" },
+      { token: "comment",     foreground: "546e7a", fontStyle: "italic" },
+      { token: "terminal",    foreground: "f78c6c", fontStyle: "bold" },
+      { token: "prodhead",    foreground: "82aaff", fontStyle: "bold" },
+      { token: "nonterminal", foreground: "82aaff" },
+      { token: "endrule",     foreground: "f07178", fontStyle: "bold" },
+      { token: "operator",    foreground: "89ddff" },
     ],
     colors: {
       "editor.background":           "#14141a",

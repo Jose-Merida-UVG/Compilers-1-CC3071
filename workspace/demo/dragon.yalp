@@ -1,8 +1,13 @@
-/* Dragon Book §4.5 — classic unambiguous expression grammar.
+/* dragon.yalp - Dragon Book section 4.5, classic expression grammar.
 
-   FIRST(e)  = { LPAREN, ID }
-   FIRST(t)  = { LPAREN, ID }
-   FIRST(f)  = { LPAREN, ID }
+   The canonical SLR(1) example grammar. Used to verify that
+   FIRST/FOLLOW sets and the LR(0) automaton match the textbook values.
+
+   Grammar: e -> e+t | t,  t -> t*f | f,  f -> (e) | id
+   Precedence: * binds tighter than + via grammar hierarchy.
+   Both operators are left-associative.
+
+   FIRST(e) = FIRST(t) = FIRST(f) = { LPAREN, ID }
    FOLLOW(e) = { $, PLUS, RPAREN }
    FOLLOW(t) = { $, PLUS, TIMES, RPAREN }
    FOLLOW(f) = { $, PLUS, TIMES, RPAREN }
@@ -14,15 +19,18 @@
 %token LPAREN RPAREN
 
 %%
-e:
+
+e:                           /* expression: + left-assoc */
     e PLUS t
   | t
 ;
-t:
+
+t:                           /* term: * left-assoc, higher prec than + */
     t TIMES f
   | f
 ;
-f:
+
+f:                           /* factor: grouped expr or identifier */
     LPAREN e RPAREN
   | ID
 ;

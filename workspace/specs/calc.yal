@@ -1,5 +1,3 @@
-(* calc lexer - hex, comparison, logic, compound assignment *)
-
 let digit  = ['0'-'9']
 let lower  = ['a'-'z']
 let upper  = ['A'-'Z']
@@ -56,7 +54,6 @@ rule gettoken =
 | '!'    { return NOT }
 | '('    { return LPAREN }
 | ')'    { return RPAREN }
-| ','    { return COMMA }
 | ';'    { return SEMI }
 | "let"  { return KWLET }
 | "if"   { return KWIF }

@@ -1,15 +1,16 @@
-/* arithmetic.yalp — expressiones aritméticas con precedencia completa.
-   Usa los tokens de arithmetic.yal.
+/* arithmetic.yalp - arithmetic expressions.
 
-   Precedencia (menor a mayor):
-     + -        (additive)
-     * / %      (multiplicative)
-     **         (power, right-assoc via right recursion)
-     atom       (literal, ident, llamada a función, kwpow, paréntesis)
+   Single expression per file, no statements, no semicolons.
+   Start symbol: expr.
 
-   FIRST/FOLLOW relevantes:
-     FIRST(expr)  = { INT, FLOAT, IDENT, LPAREN, KWPOW }
-     FOLLOW(expr) = { $, RPAREN, COMMA }
+   Precedence (low to high):
+     +  -          additive,       left-assoc
+     *  /  %       multiplicative, left-assoc
+     **            power,          right-assoc (right recursion in power)
+     atom          base case
+
+   YES: 2 + 3 * 4,  x ** 2,  pow(a,b),  f(1, 2+3),  (a+b)*c
+   NO:  -x (no unary minus),  x == y,  true/false,  statements,  0xFF
 */
 
 %token FLOAT INT
@@ -20,39 +21,39 @@
 
 %%
 
-expr:
+expr:                        /* root: + and -, left-assoc */
     expr PLUS term
   | expr MINUS term
   | term
 ;
 
-term:
+term:                        /* * / %, left-assoc */
     term TIMES power
   | term DIV power
   | term MOD power
   | power
 ;
 
-power:
+power:                       /* **, right-assoc: a**b**c = a**(b**c) */
     atom POW power
   | atom
 ;
 
-atom:
-    INT
-  | FLOAT
-  | IDENT
-  | LPAREN expr RPAREN
-  | KWPOW LPAREN expr COMMA expr RPAREN
-  | IDENT LPAREN args RPAREN
+atom:                        /* base: literal, ident, grouped expr, call */
+    INT                      /* 42 */
+  | FLOAT                    /* 3.14 */
+  | IDENT                    /* x */
+  | LPAREN expr RPAREN       /* (a + b) */
+  | KWPOW LPAREN expr COMMA expr RPAREN  /* pow(base, exp) - built-in */
+  | IDENT LPAREN args RPAREN /* f(a, b, c) - function call */
 ;
 
-args:
+args:                        /* argument list, may be empty */
     arglist
-  | /* empty */
+  | /* empty */              /* f() */
 ;
 
-arglist:
+arglist:                     /* one or more comma-separated exprs */
     expr
   | arglist COMMA expr
 ;

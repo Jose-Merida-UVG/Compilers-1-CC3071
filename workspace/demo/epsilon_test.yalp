@@ -1,31 +1,29 @@
-/* Grammar with multiple epsilon productions — tests nullable propagation.
+/* epsilon_test.yalp - grammar with multiple nullable productions.
 
-   Original :
-     S → a B D h
-     B → c C
-     C → b C | ε
-     D → E F
-     E → g | ε
-     F → f | ε
-
-   In .yalp: non-terminals are lowercase, terminals are UPPERCASE.
-   Epsilon is written as an empty alternative:
+   Tests correct nullable propagation through FIRST and FOLLOW computation.
+   Original grammar (from textbook):
+     S  -> a B D h
+     B  -> c C
+     C  -> b C | epsilon
+     D  -> E F
+     E  -> g | epsilon
+     F  -> f | epsilon
 
    Expected FIRST sets:
-     FIRST(s)    = { A }
-     FIRST(bprod) = { C }
-     FIRST(cprod) = { B, ε }
-     FIRST(dprod) = { G, F, ε }
-     FIRST(eprod) = { G, ε }
-     FIRST(fprod) = { F, ε }
+     s     = { A }
+     bprod = { C }
+     cprod = { B, epsilon }
+     dprod = { G, F, epsilon }
+     eprod = { G, epsilon }
+     fprod = { F, epsilon }
 
    Expected FOLLOW sets:
-     FOLLOW(s)    = { $ }
-     FOLLOW(bprod) = { G, F, H }
-     FOLLOW(cprod) = { G, F, H }
-     FOLLOW(dprod) = { H }
-     FOLLOW(eprod) = { F, H }
-     FOLLOW(fprod) = { H }
+     s     = { $ }
+     bprod = { G, F, H }
+     cprod = { G, F, H }
+     dprod = { H }
+     eprod = { F, H }
+     fprod = { H }
 */
 
 %token A
@@ -37,29 +35,29 @@
 
 %%
 
-s:
+s:                           /* S -> a B D h */
     A bprod dprod H
 ;
 
-bprod:
+bprod:                       /* B -> c C */
     C cprod
 ;
 
-cprod:
+cprod:                       /* C -> b C | epsilon */
     B cprod
   | /* empty */
 ;
 
-dprod:
+dprod:                       /* D -> E F */
     eprod fprod
 ;
 
-eprod:
+eprod:                       /* E -> g | epsilon */
     G
   | /* empty */
 ;
 
-fprod:
+fprod:                       /* F -> f | epsilon */
     F
   | /* empty */
 ;

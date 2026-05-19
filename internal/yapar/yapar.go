@@ -128,7 +128,7 @@ func parseTokenSection(yf *YalpFile, section string) error {
 		}
 
 		// Check for %token entries
-		if strings.HasPrefix(line, "%token") {
+		if strings.HasPrefix(line, "%token ") || line == "%token" {
 			rest := strings.TrimSpace(strings.TrimPrefix(line, "%token"))
 			for _, name := range strings.Fields(rest) {
 				// Validate name

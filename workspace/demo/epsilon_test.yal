@@ -1,0 +1,10 @@
+let ws = [' ' '\t' '\n' '\r']
+
+rule gettoken =
+  ws+ {  }
+| 'a' { return A }
+| 'b' { return B }
+| 'c' { return C }
+| 'f' { return F }
+| 'g' { return G }
+| 'h' { return H }

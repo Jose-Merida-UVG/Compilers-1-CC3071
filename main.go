@@ -13,8 +13,6 @@ func main() {
 	for _, dir := range []string{
 		workspace,
 		filepath.Join(workspace, "specs"),
-		filepath.Join(workspace, "lexers"),
-		filepath.Join(workspace, "parsers"),
 		filepath.Join(workspace, "input"),
 		filepath.Join(workspace, "output"),
 	} {

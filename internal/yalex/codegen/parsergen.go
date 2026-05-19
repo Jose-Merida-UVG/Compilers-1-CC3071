@@ -233,12 +233,11 @@ func Parse(l *Lexer) error {
 
 		case 2: // reduce
 			prod := parserProds[act.arg]
-			bodyStr := prodBody(act.arg)
 			if prod.bodyLen > 0 {
 				symStk = symStk[:len(symStk)-prod.bodyLen]
 			}
 			symStk = append(symStk, prod.head)
-			fmt.Printf("Reduce %%s → %%s\n  %%s\n", prod.head, bodyStr, sententialForm())
+			fmt.Printf("Reduce %%s → %%s\n  %%s\n", prod.head, prod.body, sententialForm())
 			derivation = append(derivation, sententialForm())
 
 			stk = stk[:len(stk)-prod.bodyLen]
@@ -294,9 +293,6 @@ func tokenName(lex Lexeme, tokName map[int]string) string {
 	return fmt.Sprintf("TOKEN%%d", lex.Token)
 }
 
-func prodBody(idx int) string {
-	return parserProds[idx].body
-}
 
 
 `)

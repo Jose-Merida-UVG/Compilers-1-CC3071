@@ -355,25 +355,35 @@ specBase := strings.TrimSuffix(filepath.Base(body.YalpPath), ".yalp")
 		return
 	}
 
-	returned := map[string]bool{}
+	// ──────────────────────────────────────────────────────────────────────────
+	// CROSS-VALIDATION: Ensure every token declared in the parser spec (.yalp)
+	// is actually returned by the lexer spec (.yal), and vice versa.
+	// ──────────────────────────────────────────────────────────────────────────
 
-	for _, action := range compiledLexer.Actions {
-		fields := strings.Fields(action)
-
-		for i := 0; i < len(fields)-1; i++ {
-			if fields[i] == "return" {
-				returned[fields[i+1]] = true
+	// Convert yalex.Rule → yapar.LexerRule for validation.
+	// This breaks the direct import dependency and keeps validation isolated.
+	lexerRules := make([]yapar.LexerRule, len(yalFile.Rules))
+	for i, rule := range yalFile.Rules {
+		patterns := make([]yapar.LexerPattern, len(rule.Patterns))
+		for j, pat := range rule.Patterns {
+			patterns[j] = yapar.LexerPattern{
+				Pattern: pat.Pattern,
+				Action:  pat.Action,
 			}
+		}
+		lexerRules[i] = yapar.LexerRule{
+			Entrypoint: rule.Entrypoint,
+			Patterns:   patterns,
 		}
 	}
 
-	for _, tok := range yalpFile.Tokens {
-		if !returned[tok.Name] {
-			fmt.Printf(
-				"warning: token %q declared in .yalp but never returned by lexer\n",
-				tok.Name,
-			)
-		}
+	// Validate that parser tokens and lexer actions are in sync.
+	// This will error if:
+	// - Parser declares a token the lexer never returns
+	// - Lexer returns a token not declared in the parser
+	if err := yapar.ValidateTokenCoverage(yalpFile.TokenMap, lexerRules); err != nil {
+		writeError(w, http.StatusUnprocessableEntity, fmt.Sprintf("token validation: %v", err))
+		return
 	}
 
 	// lexerDir := filepath.Join(h.workspace, "programs", specBase, "lexer")

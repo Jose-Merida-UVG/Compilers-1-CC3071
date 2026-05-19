@@ -142,11 +142,12 @@ func (a *Automaton) ItemString(item Item) string {
 
 // stateKey returns a canonical string that uniquely identifies a set of items.
 // Items are sorted so that two states with the same items in different order
-// produce the same key.
+// produce the same key. Uses brackets to prevent any possible collision between
+// adjacent numbers (e.g., distinguishes (1,23)|(12,3) from (12,3)|(1,23)).
 func stateKey(items []Item) string {
 	keys := make([]string, len(items))
 	for i, item := range items {
-		keys[i] = fmt.Sprintf("%d,%d", item.ProdIndex, item.Dot)
+		keys[i] = fmt.Sprintf("[%d:%d]", item.ProdIndex, item.Dot)
 	}
 	sort.Strings(keys)
 	return strings.Join(keys, "|")

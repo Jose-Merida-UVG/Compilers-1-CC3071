@@ -44,7 +44,11 @@ type YalpFile struct {
 // entrypoint, so it's basically a high-level overview calling auxiliary functions defined
 // in this file.
 func ParseYalpContent(content string) (*YalpFile, error) {
-	content = removeComments(content)
+	var err error
+	content, err = removeComments(content)
+	if err != nil {
+		return nil, err
+	}
 
 	parts := strings.SplitN(content, "%%", 2)
 	if len(parts) != 2 {
@@ -67,28 +71,43 @@ func ParseYalpContent(content string) (*YalpFile, error) {
 }
 
 // removeComments strips /* ... */ block comments from the source string.
-func removeComments(s string) string {
+// Supports nested comments by tracking depth. Returns error if comment is unclosed.
+func removeComments(s string) (string, error) {
 	var b strings.Builder
 	i := 0
+	depth := 0
+
 	// Go through the in-memory string
 	for i < len(s) {
-		// Scan for '/*'
+		// Check for '/*' - opening a comment
 		if i+1 < len(s) && s[i] == '/' && s[i+1] == '*' {
-			// Move forwards and scan for '*/'
+			depth++
 			i += 2
-			for i < len(s) {
-				if i+1 < len(s) && s[i] == '*' && s[i+1] == '/' {
-					i += 2
-					break
-				}
-				i++
-			}
-		} else {
-			b.WriteByte(s[i])
-			i++
+			continue
 		}
+
+		// Check for '*/' - closing a comment
+		if i+1 < len(s) && s[i] == '*' && s[i+1] == '/' {
+			if depth == 0 {
+				return "", fmt.Errorf("unmatched */ at position %d", i)
+			}
+			depth--
+			i += 2
+			continue
+		}
+
+		// Only write to output if we're not inside a comment
+		if depth == 0 {
+			b.WriteByte(s[i])
+		}
+		i++
 	}
-	return b.String()
+
+	if depth > 0 {
+		return "", fmt.Errorf("unclosed comment (missing %d closing */)", depth)
+	}
+
+	return b.String(), nil
 }
 
 // parseTokenSection reads the token section (before %%) and populates yf.Tokens,
@@ -126,14 +145,16 @@ func parseTokenSection(yf *YalpFile, section string) error {
 				yf.TokenMap[name] = id
 				id++
 			}
-			// Check for IGNORE entries
-		} else if strings.HasPrefix(line, "IGNORE") {
-			name := strings.TrimSpace(strings.TrimPrefix(line, "IGNORE"))
-			//
-			if name == "" {
-				return fmt.Errorf("IGNORE requires a token name")
+			// Check for IGNORE entries - must have whitespace after IGNORE keyword
+		} else if strings.HasPrefix(line, "IGNORE ") || line == "IGNORE" {
+			rest := strings.TrimSpace(strings.TrimPrefix(line, "IGNORE"))
+			if rest == "" {
+				return fmt.Errorf("IGNORE requires at least one token name")
 			}
-			yf.IgnoreList = append(yf.IgnoreList, name)
+			// Support multiple tokens on one IGNORE line, like %token does
+			for _, name := range strings.Fields(rest) {
+				yf.IgnoreList = append(yf.IgnoreList, name)
+			}
 		} else {
 			return fmt.Errorf("unexpected token section entry %q: expected %%token or IGNORE", line)
 		}
@@ -161,13 +182,16 @@ func parseProductionSection(yf *YalpFile, section string) error {
 		}
 
 		// Check for line ending in ':' (new production)
-		if strings.HasSuffix(line, ":") && !strings.ContainsAny(strings.TrimSuffix(line, ":"), " \t") {
+		if strings.HasSuffix(line, ":") {
+			name := strings.TrimSuffix(line, ":")
+			// Production name must not contain whitespace
+			if len(strings.Fields(name)) != 1 {
+				return fmt.Errorf("production name %q cannot contain whitespace", name)
+			}
 			// If we're already 'inside' of a production then the section was not ended properly
 			if current != nil {
 				return fmt.Errorf("production %q not terminated with ;", current.Name)
 			}
-			// Extract name & populate additional struct fields
-			name := strings.TrimSuffix(line, ":")
 			// Non-terminal names must be lowercase per spec
 			if strings.ToLower(name) != name {
 				return fmt.Errorf("non-terminal name %q must be lowercase", name)
@@ -183,16 +207,17 @@ func parseProductionSection(yf *YalpFile, section string) error {
 		if line == ";" {
 			// If not inside production, it's an input file error
 			if current == nil {
-				return fmt.Errorf("unexpected ;")
+				return fmt.Errorf("unexpected ; outside of production")
 			}
 			// 'Close' the production section & append to struct
 			yf.Productions = append(yf.Productions, *current)
 			current = nil
 			continue
 		}
-		// No current -> empty line,
+
+		// If we're not in a production, this line is unexpected
 		if current == nil {
-			continue
+			return fmt.Errorf("unexpected line %q: expected production declaration (name:)", line)
 		}
 
 		// Strip leading pipe for alternate rules
@@ -219,6 +244,18 @@ func parseProductionSection(yf *YalpFile, section string) error {
 // validate checks cross-section consistency: IGNORE tokens must be declared,
 // and every symbol referenced in a production body must be a known token or non-terminal.
 func validate(yf *YalpFile) error {
+	// Grammar must have at least one production
+	if len(yf.Productions) == 0 {
+		return fmt.Errorf("grammar must have at least one production")
+	}
+
+	// Each production must have at least one rule
+	for _, p := range yf.Productions {
+		if len(p.Rules) == 0 {
+			return fmt.Errorf("production %q has no rules (expected at least one, or an empty line for ε)", p.Name)
+		}
+	}
+
 	// IGNORE tokens must be declared
 	for _, name := range yf.IgnoreList {
 		if _, ok := yf.TokenMap[name]; !ok {
@@ -240,7 +277,10 @@ func validate(yf *YalpFile) error {
 					return fmt.Errorf("production %q: use an empty body line to express ε, not the literal character", p.Name)
 				}
 				_, isToken := yf.TokenMap[sym]
-				// Tokens must be uppercase, non-terminals must be lowercase
+				// Tokens must be uppercase, non-terminals must be lowercase.
+				// Note: Symbols with only underscores/digits (e.g., "_", "123") are
+				// case-neutral: ToUpper("_") == ToLower("_") == "_", so they pass both
+				// checks. This is correct behavior - they're valid in both contexts.
 				if isToken && strings.ToUpper(sym) != sym {
 					return fmt.Errorf("production %q: token %q must be uppercase", p.Name, sym)
 				}

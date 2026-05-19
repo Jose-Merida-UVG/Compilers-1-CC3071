@@ -1,0 +1,14 @@
+/* Test file for nested comments
+   /* This is nested */
+   Still in comment
+*/
+
+%token NUMBER
+%token PLUS
+
+%%
+
+expr:
+    NUMBER
+  | expr PLUS NUMBER
+;

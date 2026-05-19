@@ -1,0 +1,14 @@
+%token NUMBER
+%token PLUS
+%token WS
+%token NEWLINE
+%token COMMENT
+
+IGNORE WS NEWLINE COMMENT
+
+%%
+
+expr:
+    NUMBER
+  | expr PLUS NUMBER
+;

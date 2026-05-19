@@ -1,0 +1,7 @@
+%token NUMBER
+
+%%
+
+bad name:
+    NUMBER
+;

@@ -1,0 +1,14 @@
+%token NUMBER
+%token PLUS
+
+%%
+
+expr:
+    NUMBER
+  | expr PLUS expr
+;
+
+opt:
+    NUMBER
+  | /* epsilon */
+;

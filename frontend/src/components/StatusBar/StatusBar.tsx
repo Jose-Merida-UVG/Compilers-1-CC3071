@@ -12,7 +12,7 @@ export default function StatusBar({ activeFile, isDirty }: Props) {
     <div className="status-bar">
       <span className="status-bar__left">
         <span className="status-bar__file">
-          {activeFile ?? "YALex — Lexical Analyzer Generator"}
+          {activeFile ?? "YAPar — Parser Generator"}
         </span>
         {isDirty && <span className="status-bar__dirty"> ●</span>}
       </span>

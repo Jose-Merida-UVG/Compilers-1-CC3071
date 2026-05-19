@@ -1,12 +1,4 @@
-package yapar
-
-import (
-	"fmt"
-	"strings"
-	"unicode"
-)
-
-// This package handles parsing and validation of .yalp grammar spec files.
+// Package yapar handles parsing and validation of .yalp grammar spec files.
 // A .yalp file has two sections separated by %%:
 //   - token section: %token declarations and IGNORE directives
 //   - productions section: CFG rules in BNF form
@@ -16,6 +8,13 @@ import (
 // the grammar, computing FIRST/FOLLOW, constructing the LR(0) automaton, and
 // deriving the SLR(1) table) lives in compile.go via YalpFile.Compile() and
 // is handled via different packages.
+package yapar
+
+import (
+	"fmt"
+	"strings"
+	"unicode"
+)
 
 // TokenDef (terminals) are defined by ID (lexer output) + their names, non-terminals
 // don't need this translation layer since they're strictly grammar-internal.
@@ -24,7 +23,7 @@ type TokenDef struct {
 	ID   int    `json:"id"`
 }
 
-// Productions are defined by their non-terminal and its derivations
+// Production is defined by its non-terminal and its derivations
 type Production struct {
 	Name  string     `json:"name"`  // LHS of production
 	Rules [][]string `json:"rules"` // RHS of production
@@ -255,7 +254,7 @@ func validate(yf *YalpFile) error {
 		}
 	}
 
-		// Rule 3:
+	// Rule 3:
 	// Tokens declared under IGNORE cannot appear in productions.
 	ignoreSet := make(map[string]bool)
 	for _, tok := range yf.IgnoreList {

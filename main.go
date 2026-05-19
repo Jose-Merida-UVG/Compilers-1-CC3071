@@ -35,7 +35,7 @@ func main() {
 	}
 
 	addr := ":8080"
-	fmt.Printf("YALex server listening on http://localhost%s\n", addr)
+	fmt.Printf("YAPar server listening on http://localhost%s\n", addr)
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		fmt.Fprintf(os.Stderr, "server error: %v\n", err)
 		os.Exit(1)

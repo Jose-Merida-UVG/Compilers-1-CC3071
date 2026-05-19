@@ -145,8 +145,8 @@ export default function EditorPane({
 function Welcome() {
   return (
     <div className="editor-welcome">
-      <div className="editor-welcome__badge">YALex</div>
-      <p className="editor-welcome__sub">Lexical Analyzer Generator</p>
+      <div className="editor-welcome__badge">YAPar</div>
+      <p className="editor-welcome__sub">Parser Generator</p>
       <div className="editor-welcome__hints">
         <Hint keys={["Ctrl", "S"]} label="Force save (auto-saves after 800ms)" />
         <Hint keys={["◎ Build DFA"]} label="Generate automaton from .yal" />

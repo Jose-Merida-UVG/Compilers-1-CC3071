@@ -11,7 +11,7 @@ export default function App() {
   const [fileTree, setFileTree] = useState<FileNode[]>([]);
   const [tabs, setTabs] = useState<EditorTab[]>([]);
   const [activeTab, setActiveTab] = useState<string | null>(null);
-  const [terminalLines, setTerminalLines] = useState<string[]>(["YALex ready."]);
+  const [terminalLines, setTerminalLines] = useState<string[]>(["YAPar ready."]);
   const [terminalHeight, setTerminalHeight] = useState(200);
   const resizing = useRef(false);
   const resizeStartY = useRef(0);

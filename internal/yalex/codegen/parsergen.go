@@ -139,27 +139,22 @@ func GenerateParser(spec ParserSpec) string {
 // It returns nil on a successful parse, or a descriptive error on failure.
 // Tokens whose IDs appear in parserIgnore are silently skipped.
 func Parse(l *Lexer) error {
-	// State stack — start in state 0.
 	stk := []int{0}
 	peek := func() int { return stk[len(stk)-1] }
 
-	// Symbol stack — tracks the sentential form for derivation display.
+	// symStk stores display labels: terminals as TOKEN(value), non-terminals as their name.
 	var symStk []string
 
-	// Fetch the first non-ignored token.
 	var cur Lexeme
-
 	var symbolTable []Lexeme
-	var sententialForms []string
+	var derivation []string
 
 	nextToken := func() {
 		for {
 			cur = l.NextToken()
-
 			if cur.Token != EOF && cur.Token != ERROR {
 				symbolTable = append(symbolTable, cur)
 			}
-
 			if !parserIgnore[cur.Token] {
 				break
 			}
@@ -167,8 +162,14 @@ func Parse(l *Lexer) error {
 	}
 	nextToken()
 
-	// Map token ID → terminal name for table look-ups.
 	tokName := tokenIDToName()
+
+	sententialForm := func() string {
+		if len(symStk) == 0 {
+			return "ε"
+		}
+		return strings.Join(symStk, " ")
+	}
 
 	fmt.Println("── Parse Actions ──")
 
@@ -223,72 +224,52 @@ func Parse(l *Lexer) error {
 		switch act.kind {
 
 		case 1: // shift
-			symName := tokenName(cur, tokName)
-			fmt.Printf("Shift:  %%s\n", symName)
-			symStk = append(symStk, symName)
+			name := tokenName(cur, tokName)
+			label := fmt.Sprintf("%%s(%%s)", name, cur.Value)
+			symStk = append(symStk, label)
+			fmt.Printf("Shift  %%s\n  %%s\n", label, sententialForm())
 			stk = append(stk, act.arg)
 			nextToken()
 
 		case 2: // reduce
 			prod := parserProds[act.arg]
 			bodyStr := prodBody(act.arg)
-			fmt.Printf("Reduce: %%s → %%s\n", prod.head, bodyStr)
-
-			// Pop body symbols and push head.
 			if prod.bodyLen > 0 {
 				symStk = symStk[:len(symStk)-prod.bodyLen]
 			}
 			symStk = append(symStk, prod.head)
+			fmt.Printf("Reduce %%s → %%s\n  %%s\n", prod.head, bodyStr, sententialForm())
+			derivation = append(derivation, sententialForm())
 
-			// Record the current sentential form.
-			sententialForms = append(sententialForms, joinSymbols(symStk))
-
-			// Pop |body| states off the stack.
 			stk = stk[:len(stk)-prod.bodyLen]
-
-			// Look up Goto[top][head] to find the new state.
 			top := peek()
 
 			gotoRow, ok := parserGotoTable[top]
 			if !ok {
-				return fmt.Errorf(
-					"state %%d: no goto row (reducing by %%q)",
-					top,
-					prod.head,
-				)
+				return fmt.Errorf("state %%d: no goto row (reducing by %%q)", top, prod.head)
 			}
-
 			next, ok := gotoRow[prod.head]
 			if !ok {
-				return fmt.Errorf(
-					"state %%d: no goto for %%q",
-					top,
-					prod.head,
-				)
+				return fmt.Errorf("state %%d: no goto for %%q", top, prod.head)
 			}
-
 			stk = append(stk, next)
 
 		case 3: // accept
-			fmt.Println("\n\n── Sentential Forms (Rightmost Derivation in Reverse) ──")
-			for i, form := range sententialForms {
+			fmt.Println()
+			fmt.Println("── Derivation (top-down) ──")
+			for i, j := 0, len(derivation)-1; i < j; i, j = i+1, j-1 {
+				derivation[i], derivation[j] = derivation[j], derivation[i]
+			}
+			for i, form := range derivation {
 				fmt.Printf("%%d. %%s\n", i+1, form)
 			}
 
-			fmt.Println("\n── Symbol Table ──")
+			fmt.Println()
+			fmt.Println("── Symbol Table ──")
 			fmt.Printf("%%-20s %%-20s %%-10s\n", "LEXEME", "TOKEN", "LINE:COL")
-
 			for _, lex := range symbolTable {
-				tokenStr := tokenName(lex, tokName)
-				fmt.Printf(
-					"%%-20s %%-20s %%d:%%d\n",
-					lex.Value,
-					tokenStr,
-					lex.Line,
-					lex.Col,
-				)
+				fmt.Printf("%%-20s %%-20s %%d:%%d\n", lex.Value, tokenName(lex, tokName), lex.Line, lex.Col)
 			}
-
 			return nil
 
 		default:
@@ -317,12 +298,6 @@ func prodBody(idx int) string {
 	return parserProds[idx].body
 }
 
-func joinSymbols(syms []string) string {
-	if len(syms) == 0 {
-		return "ε"
-	}
-	return strings.Join(syms, " ")
-}
 
 `)
 	// TOKENIDTONAME() HELPER

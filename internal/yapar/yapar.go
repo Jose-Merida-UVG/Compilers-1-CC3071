@@ -225,7 +225,7 @@ func parseProductionSection(yf *YalpFile, section string) error {
 			line = strings.TrimSpace(line[1:])
 		}
 
-		// Always append — empty symbols slice means ε production.
+		// Always append, empty symbols slice means ε production.
 		current.Rules = append(current.Rules, strings.Fields(line))
 	}
 
@@ -279,8 +279,7 @@ func validate(yf *YalpFile) error {
 				_, isToken := yf.TokenMap[sym]
 				// Tokens must be uppercase, non-terminals must be lowercase.
 				// Note: Symbols with only underscores/digits (e.g., "_", "123") are
-				// case-neutral: ToUpper("_") == ToLower("_") == "_", so they pass both
-				// checks. This is correct behavior - they're valid in both contexts.
+				// case-neutral: ToUpper("_") == ToLower("_") == "_", so they pass both.
 				if isToken && strings.ToUpper(sym) != sym {
 					return fmt.Errorf("production %q: token %q must be uppercase", p.Name, sym)
 				}
@@ -333,7 +332,7 @@ func validateTokenName(name string) error {
 
 // isValidSymbolName reports whether s is a valid .yalp symbol name:
 // non-empty, starts with a letter or underscore, followed by letters, digits, or underscores.
-// Rejects the literal ε character — use an empty body line for epsilon productions instead.
+// Rejects the literal ε character, use an empty body line for epsilon productions instead.
 func isValidSymbolName(s string) bool {
 	if s == "" {
 		return false

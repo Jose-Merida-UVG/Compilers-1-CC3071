@@ -284,9 +284,7 @@ func GenerateCombined(name string, yf *yalex.YalFile, dfa *automata.DFA, actions
 	w := func(format string, args ...any) { fmt.Fprintf(&b, format, args...) }
 
 	w("package main\n\n")
-	// "fmt" is used by the scan loop; "os" is not needed here —
-	// main() lives in parser.go (produced by GenerateParser).
-	w("import \"fmt\"\n\n")
+	// No imports needed for the scan loop itself — main() and fmt live in parser.go.
 
 	// YAPar owns the token constants — emit them here so lexer actions can return them.
 	w("const (\n")

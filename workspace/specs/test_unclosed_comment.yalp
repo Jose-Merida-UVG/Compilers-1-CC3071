@@ -1,9 +1,0 @@
-/* This comment is never closed
-
-%token NUMBER
-
-%%
-
-expr:
-    NUMBER
-;

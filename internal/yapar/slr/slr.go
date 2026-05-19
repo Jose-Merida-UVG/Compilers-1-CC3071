@@ -61,6 +61,18 @@ type Table struct {
 
 // Build constructs the SLR(1) parse table from the LR(0) automaton.
 // The automaton must have been fully built (automaton.Build() called).
+// The rules are the following:
+//
+//   - Shift  — item A → α • a B  (dot is before terminal a, goto(s, a) = s')
+//     Action[s][a] = shift s'
+//
+//   - Reduce — item A → α •      (dot is at the end, nothing left to match)
+//     For each terminal a in FOLLOW(A): Action[s][a] = reduce A → α
+//
+//     3. Accept — item S' → S •     (augmented start production fully matched)
+//     The entire input has been parsed successfully.
+//
+// Writing to an already-occupied cell = conflict (grammar is not SLR(1)).
 func Build(a *lr0.Automaton) *Table {
 	productions := a.Productions
 	follow := a.Grammar.Follow
@@ -93,16 +105,16 @@ func Build(a *lr0.Automaton) *Table {
 			prod := productions[item.ProdIndex]
 
 			if item.Dot < len(prod.Body) {
-				// Dot is NOT at the end — symbol after dot drives a shift or goto.
+				// Dot is NOT at the end, so symbol after dot drives a shift or goto.
 				sym := prod.Body[item.Dot]
 
 				if sym.IsTerminal {
-					// Rule 1: A → α • a β  →  Action[state][a] = Shift(target)
+					// Terminal follows dot  →  Action[state][a] = Shift(target)
 					if target, ok := a.Transitions[state.ID][sym.Name]; ok {
 						setAction(state.ID, sym.Name, Action{Kind: ActionShift, State: target})
 					}
 				} else {
-					// Goto table: A → α • B β  →  Goto[state][B] = target
+					// Goto table: A → α • B  →  Goto[state][B] = target
 					if target, ok := a.Transitions[state.ID][sym.Name]; ok {
 						if table.Goto[state.ID] == nil {
 							table.Goto[state.ID] = make(map[string]int)
@@ -112,15 +124,15 @@ func Build(a *lr0.Automaton) *Table {
 				}
 
 			} else {
-				// Dot is at the end — complete item.
+				// Dot is at the end, complete item.
 
-				// Rule 3: augmented production S' → S •  →  Action[state][$] = Accept
+				// Augmented production S' → S •  →  Action[state][$] = Accept
 				if item.ProdIndex == 0 {
 					setAction(state.ID, "$", Action{Kind: ActionAccept})
 					continue
 				}
 
-				// Rule 2: A → α •  →  for each t in FOLLOW(A), Action[state][t] = Reduce
+				// A → α •  →  for each t in FOLLOW(A), Action[state][t] = Reduce
 				for terminal := range follow[prod.Head] {
 					setAction(state.ID, terminal, Action{Kind: ActionReduce, ProdIdx: item.ProdIndex})
 				}

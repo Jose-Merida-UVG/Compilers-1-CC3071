@@ -11,16 +11,16 @@ let ws    = [' ' '\t' '\n' '\r']
 
 rule gettoken =
   ws+          {  }
-| float        { fmt.Print("FLOAT  "); return FLOAT }
-| int          { fmt.Print("INT    "); return INT }
-| pow          { fmt.Print("POW    "); return POW }
-| kwpow        { fmt.Print("KWPOW  "); return KWPOW }
-| '+'          { fmt.Print("PLUS   "); return PLUS }
-| '-'          { fmt.Print("MINUS  "); return MINUS }
-| '*'          { fmt.Print("TIMES  "); return TIMES }
-| '/'          { fmt.Print("DIV    "); return DIV }
-| '%'          { fmt.Print("MOD    "); return MOD }
-| '('          { fmt.Print("LPAREN "); return LPAREN }
-| ')'          { fmt.Print("RPAREN "); return RPAREN }
-| ','          { fmt.Print("COMMA  "); return COMMA }
-| alpha alnum* { fmt.Print("IDENT  "); return IDENT }
+| float        { return FLOAT }
+| int          { return INT }
+| pow          { return POW }
+| kwpow        { return KWPOW }
+| '+'          { return PLUS }
+| '-'          { return MINUS }
+| '*'          { return TIMES }
+| '/'          { return DIV }
+| '%'          { return MOD }
+| '('          { return LPAREN }
+| ')'          { return RPAREN }
+| ','          { return COMMA }
+| alpha alnum* { return IDENT }

@@ -1,7 +1,5 @@
 package main
 
-import "fmt"
-
 const (
 	EOF   = 0
 	ERROR = -1
@@ -119,6 +117,43 @@ var arithmeticTrans = map[int]map[rune]int{
 		'y': 100,
 		'z': 100,
 	},
+	89: {
+		'.': 86,
+		'0': 89,
+		'1': 89,
+		'2': 89,
+		'3': 89,
+		'4': 89,
+		'5': 89,
+		'6': 89,
+		'7': 89,
+		'8': 89,
+		'9': 89,
+	},
+	86: {
+		'0': 88,
+		'1': 88,
+		'2': 88,
+		'3': 88,
+		'4': 88,
+		'5': 88,
+		'6': 88,
+		'7': 88,
+		'8': 88,
+		'9': 88,
+	},
+	88: {
+		'0': 88,
+		'1': 88,
+		'2': 88,
+		'3': 88,
+		'4': 88,
+		'5': 88,
+		'6': 88,
+		'7': 88,
+		'8': 88,
+		'9': 88,
+	},
 	100: {
 		'0': 100,
 		'1': 100,
@@ -183,48 +218,14 @@ var arithmeticTrans = map[int]map[rune]int{
 		'y': 100,
 		'z': 100,
 	},
+	94: {
+		'*': 90,
+	},
 	87: {
 		'\t': 87,
 		'\n': 87,
 		'\r': 87,
 		' ': 87,
-	},
-	89: {
-		'.': 86,
-		'0': 89,
-		'1': 89,
-		'2': 89,
-		'3': 89,
-		'4': 89,
-		'5': 89,
-		'6': 89,
-		'7': 89,
-		'8': 89,
-		'9': 89,
-	},
-	86: {
-		'0': 88,
-		'1': 88,
-		'2': 88,
-		'3': 88,
-		'4': 88,
-		'5': 88,
-		'6': 88,
-		'7': 88,
-		'8': 88,
-		'9': 88,
-	},
-	88: {
-		'0': 88,
-		'1': 88,
-		'2': 88,
-		'3': 88,
-		'4': 88,
-		'5': 88,
-		'6': 88,
-		'7': 88,
-		'8': 88,
-		'9': 88,
 	},
 	101: {
 		'0': 100,
@@ -418,28 +419,25 @@ var arithmeticTrans = map[int]map[rune]int{
 		'y': 100,
 		'z': 100,
 	},
-	94: {
-		'*': 90,
-	},
 }
 
 var arithmeticAccept = map[int]int{
-	92: 6,
-	100: 14,
-	98: 12,
-	96: 10,
-	87: 1,
 	89: 3,
 	88: 2,
-	93: 7,
+	100: 14,
+	94: 8,
+	90: 4,
 	97: 11,
+	87: 1,
+	92: 6,
 	101: 14,
 	102: 14,
 	91: 5,
-	94: 8,
-	90: 4,
 	99: 13,
+	93: 7,
 	95: 9,
+	96: 10,
+	98: 12,
 }
 
 func (l *Lexer) gettoken() int {
@@ -484,31 +482,31 @@ func (l *Lexer) gettoken() int {
 		case 1:
 			// no action
 		case 2:
-			fmt.Print("FLOAT  "); return FLOAT
+			return FLOAT
 		case 3:
-			fmt.Print("INT    "); return INT
+			return INT
 		case 4:
-			fmt.Print("POW    "); return POW
+			return POW
 		case 5:
-			fmt.Print("KWPOW  "); return KWPOW
+			return KWPOW
 		case 6:
-			fmt.Print("PLUS   "); return PLUS
+			return PLUS
 		case 7:
-			fmt.Print("MINUS  "); return MINUS
+			return MINUS
 		case 8:
-			fmt.Print("TIMES  "); return TIMES
+			return TIMES
 		case 9:
-			fmt.Print("DIV    "); return DIV
+			return DIV
 		case 10:
-			fmt.Print("MOD    "); return MOD
+			return MOD
 		case 11:
-			fmt.Print("LPAREN "); return LPAREN
+			return LPAREN
 		case 12:
-			fmt.Print("RPAREN "); return RPAREN
+			return RPAREN
 		case 13:
-			fmt.Print("COMMA  "); return COMMA
+			return COMMA
 		case 14:
-			fmt.Print("IDENT  "); return IDENT
+			return IDENT
 		}
 	}
 	return EOF

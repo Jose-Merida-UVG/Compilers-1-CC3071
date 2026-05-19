@@ -29,7 +29,7 @@ function toDot(data: LR0GraphData): string {
 
   lines.push("digraph LR0 {");
   lines.push("  rankdir=LR");
-  lines.push('  graph [bgcolor="transparent" pad="0.5" nodesep="1.0" ranksep="1.5" splines=ortho]');
+  lines.push('  graph [bgcolor="transparent" pad="0.5" nodesep="0.4" ranksep="0.8" splines=ortho]');
   lines.push('  edge [fontname="Courier New" fontsize=10 color="#555575" fontcolor="#a090cc" arrowsize=0.7]');
   lines.push('  node [shape=none fontname="Courier New" fontsize=10]');
   lines.push("");

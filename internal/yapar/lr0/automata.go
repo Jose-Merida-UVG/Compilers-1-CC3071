@@ -39,7 +39,7 @@ type Automaton struct {
 
 // New builds the initial Automaton from an already-augmented Grammar.
 // The augmented grammar must have S' → S as its first production (index 0).
-// Must call g.Augment() before passing the grammar here.
+// MUST CALL g.Augment() BEFORE PASSING THE GRAMMAR HERE.
 func New(g *grammar.Grammar) *Automaton {
 	// Build the head → production indices index up front so Closure and Goto
 	// can look up productions for a non-terminal.
